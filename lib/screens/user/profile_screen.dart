@@ -1,9 +1,12 @@
+import 'dart:io';
+
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../providers/app_provider.dart';
 import '../../widgets/common.dart';
 import '../entry_screen.dart';
 import 'report_detail_screen.dart';
+import 'edit_profile_screen.dart';
 
 class ProfileScreen extends StatelessWidget {
   const ProfileScreen({super.key});
@@ -15,11 +18,20 @@ class ProfileScreen extends StatelessWidget {
         padding: const EdgeInsets.all(16),
         children: [
           const SizedBox(height: 8),
-          const Center(
+          Center(
             child: CircleAvatar(
               radius: 48,
               backgroundColor: Color(0xFFDDE4FF),
-              child: Icon(Icons.person, color: primary, size: 56),
+              backgroundImage:
+                  app.profileImagePath != null &&
+                      File(app.profileImagePath!).existsSync()
+                  ? FileImage(File(app.profileImagePath!))
+                  : null,
+              child:
+                  app.profileImagePath == null ||
+                      !File(app.profileImagePath!).existsSync()
+                  ? const Icon(Icons.person, color: primary, size: 56)
+                  : null,
             ),
           ),
           const SizedBox(height: 12),
@@ -28,6 +40,14 @@ class ProfileScreen extends StatelessWidget {
               app.userName,
               style: const TextStyle(fontSize: 23, fontWeight: FontWeight.bold),
             ),
+          ),
+          TextButton.icon(
+            onPressed: () => Navigator.push(
+              context,
+              MaterialPageRoute(builder: (_) => const EditProfileScreen()),
+            ),
+            icon: const Icon(Icons.edit_outlined),
+            label: const Text('Edit Profile'),
           ),
           Center(
             child: Text(

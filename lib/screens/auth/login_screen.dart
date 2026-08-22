@@ -6,6 +6,7 @@ import '../../widgets/common.dart';
 import '../admin/admin_home.dart';
 import '../user/user_home.dart';
 import 'register_screen.dart';
+import 'forgot_password_screen.dart';
 
 class LoginScreen extends StatefulWidget {
   final bool admin;
@@ -30,11 +31,18 @@ class _LoginScreenState extends State<LoginScreen> {
 
   Future<void> _login() async {
     if (!_formKey.currentState!.validate()) return;
-    await context.read<AppProvider>().login(
+    final error = await context.read<AppProvider>().login(
       _email.text.trim(),
+      _password.text,
       admin: widget.admin,
     );
     if (!mounted) return;
+    if (error != null) {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(error)));
+      return;
+    }
     Navigator.pushReplacement(
       context,
       MaterialPageRoute(
@@ -111,6 +119,16 @@ class _LoginScreenState extends State<LoginScreen> {
                     ),
                   ),
                 ),
+                if (!widget.admin)
+                  TextButton(
+                    onPressed: () => Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => const ForgotPasswordScreen(),
+                      ),
+                    ),
+                    child: const Text('Forgot password?'),
+                  ),
                 if (!widget.admin)
                   TextButton(
                     onPressed: () => Navigator.push(

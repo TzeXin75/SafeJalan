@@ -1,14 +1,16 @@
 import 'package:flutter/material.dart';
+import '../../models/user_account.dart';
+import '../../services/database_service.dart';
 
 class ManageUsersScreen extends StatelessWidget {
   const ManageUsersScreen({super.key});
 
   @override
   Widget build(BuildContext context) {
-    return const SafeArea(
+    return SafeArea(
       child: Column(
         children: [
-          Padding(
+          const Padding(
             padding: EdgeInsets.all(16),
             child: Align(
               alignment: Alignment.centerLeft,
@@ -19,34 +21,33 @@ class ManageUsersScreen extends StatelessWidget {
             ),
           ),
           Expanded(
-            child: Center(
-              child: Padding(
-                padding: EdgeInsets.all(32),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Icon(
-                      Icons.group_outlined,
-                      size: 58,
-                      color: Colors.blueGrey,
-                    ),
-                    SizedBox(height: 12),
-                    Text(
-                      'No users yet',
-                      style: TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.bold,
+            child: FutureBuilder<List<UserAccount>>(
+              future: DatabaseService.instance.getUsers(),
+              builder: (context, snapshot) {
+                if (snapshot.connectionState != ConnectionState.done) {
+                  return const Center(child: CircularProgressIndicator());
+                }
+                final users = snapshot.data ?? [];
+                if (users.isEmpty) {
+                  return const Center(child: Text('No registered users yet.'));
+                }
+                return ListView.separated(
+                  padding: const EdgeInsets.all(16),
+                  itemCount: users.length,
+                  separatorBuilder: (_, _) => const SizedBox(height: 8),
+                  itemBuilder: (context, index) {
+                    final user = users[index];
+                    return Card(
+                      child: ListTile(
+                        leading: const CircleAvatar(child: Icon(Icons.person)),
+                        title: Text(user.name),
+                        subtitle: Text(user.email),
+                        trailing: const Chip(label: Text('User')),
                       ),
-                    ),
-                    SizedBox(height: 6),
-                    Text(
-                      'Registered users will appear here after a backend user database is connected.',
-                      textAlign: TextAlign.center,
-                      style: TextStyle(color: Colors.blueGrey),
-                    ),
-                  ],
-                ),
-              ),
+                    );
+                  },
+                );
+              },
             ),
           ),
         ],

@@ -10,7 +10,6 @@ dependencies:
   flutter:
     sdk: flutter
   provider: ^6.1.5+1
-  shared_preferences: ^2.5.3
   sqflite: ^2.4.2
   path_provider: ^2.1.5
   image_picker: ^1.2.0
@@ -21,6 +20,7 @@ dependencies:
   intl: ^0.20.2
   supabase_flutter: ^2.17.2
   uuid: ^4.6.0
+  crypto: ^3.0.6
 
 dev_dependencies:
   flutter_test:

@@ -68,11 +68,18 @@ class _RegisterScreenState extends State<RegisterScreen> {
               child: FilledButton(
                 onPressed: () async {
                   if (!_key.currentState!.validate()) return;
-                  await context.read<AppProvider>().register(
+                  final error = await context.read<AppProvider>().register(
                     _name.text.trim(),
                     _email.text.trim(),
+                    _password.text,
                   );
                   if (!context.mounted) return;
+                  if (error != null) {
+                    ScaffoldMessenger.of(
+                      context,
+                    ).showSnackBar(SnackBar(content: Text(error)));
+                    return;
+                  }
                   Navigator.pushAndRemoveUntil(
                     context,
                     MaterialPageRoute(builder: (_) => const UserHome()),

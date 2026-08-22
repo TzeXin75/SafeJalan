@@ -1,5 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
+import '../../providers/app_provider.dart';
 import '../../widgets/common.dart';
+import '../entry_screen.dart';
 import 'dashboard_screen.dart';
 import 'manage_reports_screen.dart';
 import 'manage_users_screen.dart';
@@ -23,6 +26,24 @@ class _AdminHomeState extends State<AdminHome> {
   ];
   @override
   Widget build(BuildContext context) => Scaffold(
+    appBar: AppBar(
+      title: const Text('SafeJalan Admin'),
+      actions: [
+        IconButton(
+          tooltip: 'Logout',
+          icon: const Icon(Icons.logout),
+          onPressed: () async {
+            await context.read<AppProvider>().logout();
+            if (!context.mounted) return;
+            Navigator.pushAndRemoveUntil(
+              context,
+              MaterialPageRoute(builder: (_) => const EntryScreen()),
+              (_) => false,
+            );
+          },
+        ),
+      ],
+    ),
     body: IndexedStack(index: _index, children: _pages),
     bottomNavigationBar: NavigationBar(
       selectedIndex: _index,
