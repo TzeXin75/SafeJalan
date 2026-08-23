@@ -7,6 +7,8 @@ supabase_config.json
 .pub/
 build/
 android/.gradle/
+.gradle-user-home/
+android/.kotlin/
 android/local.properties
 *.iml
 .idea/

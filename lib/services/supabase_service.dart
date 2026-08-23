@@ -2,6 +2,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../config/supabase_config.dart';
 import '../models/report.dart';
+import '../models/user_account.dart';
 
 class SupabaseService {
   SupabaseService._internal();
@@ -33,5 +34,40 @@ class SupabaseService {
 
   Future<void> deleteReport(String remoteId) async {
     await _client.from('road_reports').delete().eq('id', remoteId);
+  }
+
+  Future<void> upsertVerification(String reportId, String userEmail) async {
+    await _client.from('report_verifications').upsert({
+      'report_id': reportId,
+      'user_email': userEmail.toLowerCase(),
+    }, onConflict: 'report_id,user_email');
+  }
+
+  Future<void> deleteVerification(String reportId, String userEmail) async {
+    await _client
+        .from('report_verifications')
+        .delete()
+        .eq('report_id', reportId)
+        .eq('user_email', userEmail.toLowerCase());
+  }
+
+  Future<void> upsertUserProfile(
+    UserAccount user, {
+    String? previousEmail,
+  }) async {
+    if (previousEmail != null &&
+        previousEmail.toLowerCase() != user.email.toLowerCase()) {
+      await deleteUserProfile(previousEmail);
+    }
+    await _client
+        .from('user_profiles')
+        .upsert(user.toRemoteMap(), onConflict: 'email');
+  }
+
+  Future<void> deleteUserProfile(String email) async {
+    await _client
+        .from('user_profiles')
+        .delete()
+        .eq('email', email.toLowerCase());
   }
 }

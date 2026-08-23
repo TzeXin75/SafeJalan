@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../providers/app_provider.dart';
+import '../../services/database_service.dart';
 import '../../widgets/common.dart';
 
 class DashboardScreen extends StatelessWidget {
@@ -13,21 +14,25 @@ class DashboardScreen extends StatelessWidget {
       child: ListView(
         padding: const EdgeInsets.all(16),
         children: [
-          const Text(
-            'Dashboard',
-            style: TextStyle(fontSize: 26, fontWeight: FontWeight.bold),
-          ),
-          const Text('Live overview', style: TextStyle(color: Colors.blueGrey)),
+          const PageTitle('Dashboard', 'Live community safety overview'),
           const SizedBox(height: 16),
           GridView.count(
             crossAxisCount: 2,
             shrinkWrap: true,
             physics: const NeverScrollableScrollPhysics(),
-            childAspectRatio: 1.7,
+            childAspectRatio: 1.45,
             crossAxisSpacing: 10,
             mainAxisSpacing: 10,
             children: [
-              const _Kpi(Icons.people, '0', 'Total Users', primary),
+              FutureBuilder<int>(
+                future: DatabaseService.instance.getRegularUserCount(),
+                builder: (context, snapshot) => _Kpi(
+                  Icons.people,
+                  '${snapshot.data ?? 0}',
+                  'Total Users',
+                  primary,
+                ),
+              ),
               _Kpi(
                 Icons.report,
                 '${reports.length}',
@@ -44,10 +49,7 @@ class DashboardScreen extends StatelessWidget {
             ],
           ),
           const SizedBox(height: 20),
-          const Text(
-            'Report completion',
-            style: TextStyle(fontWeight: FontWeight.bold, fontSize: 17),
-          ),
+          const PageTitle('Report completion', 'Resolution progress'),
           const SizedBox(height: 8),
           Card(
             child: Padding(
@@ -61,8 +63,8 @@ class DashboardScreen extends StatelessWidget {
                         : '${(resolved / reports.length * 100).round()}%',
                     style: const TextStyle(
                       fontSize: 28,
-                      fontWeight: FontWeight.bold,
-                      color: Colors.green,
+                      fontWeight: FontWeight.w800,
+                      color: safeTeal,
                     ),
                   ),
                   const SizedBox(height: 8),
@@ -74,17 +76,14 @@ class DashboardScreen extends StatelessWidget {
                   const SizedBox(height: 8),
                   const Text(
                     'Reports resolved by local authorities',
-                    style: TextStyle(color: Colors.blueGrey),
+                    style: TextStyle(color: mutedText),
                   ),
                 ],
               ),
             ),
           ),
           const SizedBox(height: 16),
-          const Text(
-            'Recent Reports',
-            style: TextStyle(fontWeight: FontWeight.bold, fontSize: 17),
-          ),
+          const PageTitle('Recent Reports', 'Latest community submissions'),
           const SizedBox(height: 8),
           ...reports.take(3).map((r) => ReportTile(report: r, onTap: () {})),
         ],
@@ -101,31 +100,26 @@ class _Kpi extends StatelessWidget {
   @override
   Widget build(BuildContext context) => Card(
     child: Padding(
-      padding: const EdgeInsets.all(12),
-      child: Row(
+      padding: const EdgeInsets.all(14),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          CircleAvatar(
-            backgroundColor: color.withValues(alpha: .12),
-            child: Icon(icon, color: color),
+          Container(
+            width: 36,
+            height: 36,
+            decoration: BoxDecoration(
+              color: color.withValues(alpha: .1),
+              borderRadius: BorderRadius.circular(11),
+            ),
+            child: Icon(icon, color: color, size: 20),
           ),
-          const SizedBox(width: 10),
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Text(
-                value,
-                style: const TextStyle(
-                  fontSize: 20,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-              Text(
-                label,
-                style: const TextStyle(fontSize: 11, color: Colors.blueGrey),
-              ),
-            ],
+          const Spacer(),
+          Text(
+            value,
+            style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w800),
           ),
+          Text(label, style: const TextStyle(fontSize: 11, color: mutedText)),
         ],
       ),
     ),

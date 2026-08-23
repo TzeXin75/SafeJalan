@@ -19,7 +19,11 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
   final _key = GlobalKey<FormState>();
   late final TextEditingController _name;
   late final TextEditingController _email;
+  final _currentPassword = TextEditingController();
+  final _newPassword = TextEditingController();
+  final _confirmPassword = TextEditingController();
   File? _newImage;
+  String? _saveError;
 
   @override
   void initState() {
@@ -33,6 +37,9 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
   void dispose() {
     _name.dispose();
     _email.dispose();
+    _currentPassword.dispose();
+    _newPassword.dispose();
+    _confirmPassword.dispose();
     super.dispose();
   }
 
@@ -57,7 +64,19 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
   }
 
   Future<void> _save() async {
+    setState(() => _saveError = null);
     if (!_key.currentState!.validate()) return;
+    if (_newPassword.text.isNotEmpty) {
+      final passwordError = await context.read<AppProvider>().changePassword(
+        _currentPassword.text,
+        _newPassword.text,
+      );
+      if (!mounted) return;
+      if (passwordError != null) {
+        setState(() => _saveError = passwordError);
+        return;
+      }
+    }
     final imagePath = await _saveImage();
     if (!mounted) return;
     final error = await context.read<AppProvider>().saveProfile(
@@ -67,9 +86,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
     );
     if (!mounted) return;
     if (error != null) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text(error)));
+      setState(() => _saveError = error);
       return;
     }
     Navigator.pop(context);
@@ -123,6 +140,60 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                   ? null
                   : 'Enter a valid email',
             ),
+            const SizedBox(height: 24),
+            const Text(
+              'Change Password (optional)',
+              style: TextStyle(fontSize: 17, fontWeight: FontWeight.bold),
+            ),
+            const SizedBox(height: 12),
+            TextFormField(
+              controller: _currentPassword,
+              obscureText: true,
+              decoration: safeInput(
+                'Current password',
+                icon: Icons.lock_outline,
+              ),
+              validator: (value) {
+                if (_newPassword.text.isEmpty) return null;
+                return (value?.length ?? 0) < 6
+                    ? 'Enter your current password'
+                    : null;
+              },
+            ),
+            const SizedBox(height: 14),
+            TextFormField(
+              controller: _newPassword,
+              obscureText: true,
+              decoration: safeInput('New password', icon: Icons.password),
+              validator: (value) {
+                if ((value ?? '').isEmpty && _currentPassword.text.isEmpty) {
+                  return null;
+                }
+                return (value?.length ?? 0) < 6 ? 'Minimum 6 characters' : null;
+              },
+            ),
+            const SizedBox(height: 14),
+            TextFormField(
+              controller: _confirmPassword,
+              obscureText: true,
+              decoration: safeInput(
+                'Confirm new password',
+                icon: Icons.password,
+              ),
+              validator: (value) {
+                if (_newPassword.text.isEmpty) return null;
+                return value != _newPassword.text
+                    ? 'Passwords do not match'
+                    : null;
+              },
+            ),
+            if (_saveError != null) ...[
+              const SizedBox(height: 6),
+              Text(
+                _saveError!,
+                style: const TextStyle(color: Colors.red, fontSize: 12),
+              ),
+            ],
             const SizedBox(height: 22),
             FilledButton(onPressed: _save, child: const Text('Save Profile')),
           ],

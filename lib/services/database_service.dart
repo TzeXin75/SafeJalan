@@ -16,10 +16,11 @@ class DatabaseService {
     final directory = await getApplicationDocumentsDirectory();
     return openDatabase(
       '${directory.path}/safejalan.db',
-      version: 4,
+      version: 5,
       onCreate: (db, version) async {
         await _createReportsTable(db);
         await _createUserTables(db);
+        await _createVerificationTable(db);
       },
       onUpgrade: (db, oldVersion, newVersion) async {
         if (oldVersion < 2) {
@@ -43,7 +44,84 @@ class DatabaseService {
           );
         }
         if (oldVersion < 4) await _createUserTables(db);
+        if (oldVersion < 5) await _createVerificationTable(db);
       },
+    );
+  }
+
+  Future<void> _createVerificationTable(Database db) async {
+    await db.execute('''
+      CREATE TABLE IF NOT EXISTS ReportVerifications(
+        reportRemoteId TEXT NOT NULL,
+        userEmail TEXT NOT NULL COLLATE NOCASE,
+        isDeleted INTEGER NOT NULL DEFAULT 0,
+        syncStatus TEXT NOT NULL DEFAULT 'pending',
+        updatedAt TEXT NOT NULL,
+        PRIMARY KEY(reportRemoteId, userEmail)
+      )
+    ''');
+  }
+
+  Future<Set<String>> getVerifiedReportIds(String userEmail) async {
+    if (userEmail.isEmpty) return <String>{};
+    final rows = await (await database).query(
+      'ReportVerifications',
+      columns: ['reportRemoteId'],
+      where: 'userEmail = ? COLLATE NOCASE AND isDeleted = 0',
+      whereArgs: [userEmail],
+    );
+    return rows.map((row) => row['reportRemoteId'] as String).toSet();
+  }
+
+  Future<bool> toggleReportVerification(
+    String reportRemoteId,
+    String userEmail,
+  ) async {
+    final db = await database;
+    final rows = await db.query(
+      'ReportVerifications',
+      where: 'reportRemoteId = ? AND userEmail = ? COLLATE NOCASE',
+      whereArgs: [reportRemoteId, userEmail],
+      limit: 1,
+    );
+    final currentlyVerified =
+        rows.isNotEmpty && (rows.first['isDeleted'] as int? ?? 0) == 0;
+    final now = DateTime.now().toUtc().toIso8601String();
+    await db.insert('ReportVerifications', {
+      'reportRemoteId': reportRemoteId,
+      'userEmail': userEmail.toLowerCase(),
+      'isDeleted': currentlyVerified ? 1 : 0,
+      'syncStatus': 'pending',
+      'updatedAt': now,
+    }, conflictAlgorithm: ConflictAlgorithm.replace);
+    return !currentlyVerified;
+  }
+
+  Future<List<Map<String, Object?>>> getPendingVerifications() async =>
+      (await database).query(
+        'ReportVerifications',
+        where: "syncStatus = 'pending'",
+      );
+
+  Future<void> markVerificationSynced(
+    String reportRemoteId,
+    String userEmail,
+    bool isDeleted,
+  ) async {
+    final db = await database;
+    if (isDeleted) {
+      await db.delete(
+        'ReportVerifications',
+        where: 'reportRemoteId = ? AND userEmail = ? COLLATE NOCASE',
+        whereArgs: [reportRemoteId, userEmail],
+      );
+      return;
+    }
+    await db.update(
+      'ReportVerifications',
+      {'syncStatus': 'synced'},
+      where: 'reportRemoteId = ? AND userEmail = ? COLLATE NOCASE',
+      whereArgs: [reportRemoteId, userEmail],
     );
   }
 
@@ -97,10 +175,16 @@ class DatabaseService {
   Future<List<UserAccount>> getUsers() async {
     final rows = await (await database).query(
       'Users',
-      where: 'isAdmin = 0',
       orderBy: 'name COLLATE NOCASE',
     );
     return rows.map(UserAccount.fromMap).toList();
+  }
+
+  Future<int> getRegularUserCount() async {
+    final result = await (await database).rawQuery(
+      'SELECT COUNT(*) AS total FROM Users WHERE isAdmin = 0',
+    );
+    return Sqflite.firstIntValue(result) ?? 0;
   }
 
   Future<int> insertUser(UserAccount user) async =>
@@ -127,6 +211,29 @@ class DatabaseService {
       where: 'id = ?',
       whereArgs: [id],
     );
+  }
+
+  Future<void> updateManagedUser(
+    int id,
+    String name,
+    String email,
+    bool isAdmin,
+  ) async {
+    final user = await findUserById(id);
+    if (user == null) return;
+    await (await database).update(
+      'Users',
+      {'name': name, 'email': email.toLowerCase(), 'isAdmin': isAdmin ? 1 : 0},
+      where: 'id = ?',
+      whereArgs: [id],
+    );
+    if (user.email.toLowerCase() != email.toLowerCase()) {
+      await changeReportOwner(user.email, email);
+    }
+  }
+
+  Future<void> deleteUser(int id) async {
+    await (await database).delete('Users', where: 'id = ?', whereArgs: [id]);
   }
 
   Future<void> changeReportOwner(String oldEmail, String newEmail) async {

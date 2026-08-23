@@ -1,5 +1,7 @@
+import 'dart:async';
 import 'dart:convert';
 
+import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:crypto/crypto.dart';
 import 'package:flutter/material.dart';
 import 'package:sqflite/sqflite.dart';
@@ -7,10 +9,12 @@ import '../models/user_account.dart';
 import '../models/report.dart';
 import '../repositories/report_repository.dart';
 import '../services/database_service.dart';
+import '../services/supabase_service.dart';
 
 class AppProvider extends ChangeNotifier {
   final DatabaseService _database = DatabaseService.instance;
   final ReportRepository _reportsRepository = ReportRepository();
+  final SupabaseService _supabase = SupabaseService.instance;
   List<RoadReport> reports = [];
   String userName = 'New User';
   String email = '';
@@ -19,6 +23,10 @@ class AppProvider extends ChangeNotifier {
   bool isLoggedIn = false, isAdmin = false, isLoading = true;
   bool isSyncing = false;
   String? lastSyncError;
+  StreamSubscription<List<ConnectivityResult>>? _connectivitySubscription;
+  bool _hadNetwork = false;
+  final Set<String> _verifiedReportIds = <String>{};
+  final Set<String> _updatingVerificationIds = <String>{};
 
   bool get isRemoteConfigured => _reportsRepository.isRemoteConfigured;
   List<RoadReport> get myReports => reports
@@ -28,13 +36,32 @@ class AppProvider extends ChangeNotifier {
       )
       .toList();
 
+  bool hasVerified(RoadReport report) =>
+      report.remoteId != null && _verifiedReportIds.contains(report.remoteId);
+
+  bool isUpdatingVerification(RoadReport report) =>
+      report.remoteId != null &&
+      _updatingVerificationIds.contains(report.remoteId);
+
+  RoadReport latestVersionOf(RoadReport report) => reports.firstWhere(
+    (item) => report.remoteId != null
+        ? item.remoteId == report.remoteId
+        : item.id == report.id,
+    orElse: () => report,
+  );
+
   Future<void> initialise() async {
     final signedInUser = await _database.getSignedInUser();
-    if (signedInUser != null) _applyUser(signedInUser);
+    if (signedInUser != null) {
+      _applyUser(signedInUser);
+      await _loadVerifications();
+    }
     reports = await _reportsRepository.getLocalReports();
+    await _startConnectivityListener();
     isLoading = false;
     notifyListeners();
     await syncReports();
+    await _syncAllUsers();
   }
 
   String _hashPassword(String password) =>
@@ -65,6 +92,8 @@ class AppProvider extends ChangeNotifier {
     }
     _applyUser(user);
     await _database.saveSignedInUser(user.id);
+    await _loadVerifications();
+    await _trySyncUser(user);
     notifyListeners();
     return null;
   }
@@ -82,10 +111,7 @@ class AppProvider extends ChangeNotifier {
         ),
       );
       final user = await _database.findUserById(id);
-      if (user == null) return 'Unable to create account';
-      _applyUser(user);
-      await _database.saveSignedInUser(id);
-      notifyListeners();
+      if (user != null) await _trySyncUser(user);
       return null;
     } on DatabaseException {
       return 'This email is already registered';
@@ -117,6 +143,10 @@ class AppProvider extends ChangeNotifier {
       reports = await _reportsRepository.getLocalReports();
     }
     notifyListeners();
+    final updatedUser = await _database.findUserById(currentUserId!);
+    if (updatedUser != null) {
+      await _trySyncUser(updatedUser, previousEmail: oldEmail);
+    }
     if (oldEmail.toLowerCase() != value.toLowerCase()) {
       await syncReports();
     }
@@ -127,6 +157,25 @@ class AppProvider extends ChangeNotifier {
     final user = await _database.findUserByEmail(value);
     if (user == null || user.isAdmin) {
       return 'No user account found for this email';
+    }
+    if (user.passwordHash == _hashPassword(newPassword)) {
+      return 'New password cannot be the same as your current password';
+    }
+    await _database.updatePassword(user.id!, _hashPassword(newPassword));
+    return null;
+  }
+
+  Future<String?> changePassword(
+    String currentPassword,
+    String newPassword,
+  ) async {
+    if (currentUserId == null) return 'Please log in again';
+    final user = await _database.findUserById(currentUserId!);
+    if (user == null || user.passwordHash != _hashPassword(currentPassword)) {
+      return 'Current password is incorrect';
+    }
+    if (user.passwordHash == _hashPassword(newPassword)) {
+      return 'New password cannot be the same as your current password';
     }
     await _database.updatePassword(user.id!, _hashPassword(newPassword));
     return null;
@@ -140,6 +189,7 @@ class AppProvider extends ChangeNotifier {
     profileImagePath = null;
     isLoggedIn = false;
     isAdmin = false;
+    _verifiedReportIds.clear();
     notifyListeners();
   }
 
@@ -157,13 +207,39 @@ class AppProvider extends ChangeNotifier {
     await syncReports();
   }
 
-  Future<void> vote(RoadReport report) async {
-    await _reportsRepository.updateReport(
-      report.copyWith(votes: report.votes + 1),
-    );
-    reports = await _reportsRepository.getLocalReports();
+  Future<bool> toggleVerification(RoadReport report) async {
+    final current = latestVersionOf(report);
+    final reportId = current.remoteId;
+    if (email.isEmpty || reportId == null) return false;
+    if (_updatingVerificationIds.contains(reportId)) {
+      return hasVerified(current);
+    }
+
+    _updatingVerificationIds.add(reportId);
     notifyListeners();
-    await syncReports();
+    try {
+      final nowVerified = await _database.toggleReportVerification(
+        reportId,
+        email,
+      );
+      if (nowVerified) {
+        _verifiedReportIds.add(reportId);
+      } else {
+        _verifiedReportIds.remove(reportId);
+      }
+
+      final nextVotes = nowVerified
+          ? current.votes + 1
+          : (current.votes > 0 ? current.votes - 1 : 0);
+      await _reportsRepository.updateReport(current.copyWith(votes: nextVotes));
+      reports = await _reportsRepository.getLocalReports();
+      notifyListeners();
+      await syncReports();
+      return nowVerified;
+    } finally {
+      _updatingVerificationIds.remove(reportId);
+      notifyListeners();
+    }
   }
 
   Future<void> deleteReport(RoadReport report) async {
@@ -178,13 +254,82 @@ class AppProvider extends ChangeNotifier {
     isSyncing = true;
     notifyListeners();
     final result = await _reportsRepository.sync();
+    await _syncPendingVerifications();
     lastSyncError = result.error;
     reports = await _reportsRepository.getLocalReports();
     isSyncing = false;
     notifyListeners();
   }
 
+  Future<void> _syncAllUsers() async {
+    if (!_supabase.isConfigured) return;
+    final users = await _database.getUsers();
+    for (final user in users) {
+      await _trySyncUser(user);
+    }
+  }
+
+  Future<void> _loadVerifications() async {
+    _verifiedReportIds
+      ..clear()
+      ..addAll(await _database.getVerifiedReportIds(email));
+  }
+
+  Future<void> _syncPendingVerifications() async {
+    if (!_supabase.isConfigured) return;
+    final pending = await _database.getPendingVerifications();
+    for (final row in pending) {
+      final reportId = row['reportRemoteId'] as String;
+      final userEmail = row['userEmail'] as String;
+      final isDeleted = (row['isDeleted'] as int? ?? 0) == 1;
+      try {
+        if (isDeleted) {
+          await _supabase.deleteVerification(reportId, userEmail);
+        } else {
+          await _supabase.upsertVerification(reportId, userEmail);
+        }
+        await _database.markVerificationSynced(reportId, userEmail, isDeleted);
+      } catch (_) {
+        // Leave this row pending so the next reconnect can retry it.
+      }
+    }
+  }
+
+  Future<void> _startConnectivityListener() async {
+    final connectivity = Connectivity();
+    final initial = await connectivity.checkConnectivity();
+    _hadNetwork = initial.any((item) => item != ConnectivityResult.none);
+    await _connectivitySubscription?.cancel();
+    _connectivitySubscription = connectivity.onConnectivityChanged.listen((
+      results,
+    ) {
+      final hasNetwork = results.any((item) => item != ConnectivityResult.none);
+      if (hasNetwork && !_hadNetwork) unawaited(_retryPendingData());
+      _hadNetwork = hasNetwork;
+    });
+  }
+
+  Future<void> _retryPendingData() async {
+    await syncReports();
+    await _syncAllUsers();
+  }
+
+  Future<void> _trySyncUser(UserAccount user, {String? previousEmail}) async {
+    if (!_supabase.isConfigured) return;
+    try {
+      await _supabase.upsertUserProfile(user, previousEmail: previousEmail);
+    } catch (_) {
+      // The local SQLite account remains available if the device is offline.
+    }
+  }
+
   int get points =>
       myReports.length * 80 +
       myReports.fold(0, (sum, item) => sum + item.votes * 5);
+
+  @override
+  void dispose() {
+    _connectivitySubscription?.cancel();
+    super.dispose();
+  }
 }

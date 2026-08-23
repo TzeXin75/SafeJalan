@@ -15,6 +15,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
   final _key = GlobalKey<FormState>();
   final _email = TextEditingController();
   final _password = TextEditingController();
+  String? _resetError;
 
   @override
   void dispose() {
@@ -24,6 +25,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
   }
 
   Future<void> _reset() async {
+    setState(() => _resetError = null);
     if (!_key.currentState!.validate()) return;
     final error = await context.read<AppProvider>().resetPassword(
       _email.text.trim(),
@@ -31,15 +33,10 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
     );
     if (!mounted) return;
     if (error != null) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text(error)));
+      setState(() => _resetError = error);
       return;
     }
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Password updated. Please log in.')),
-    );
-    Navigator.pop(context);
+    Navigator.pop(context, true);
   }
 
   @override
@@ -80,6 +77,13 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
             validator: (value) =>
                 (value?.length ?? 0) < 6 ? 'Minimum 6 characters' : null,
           ),
+          if (_resetError != null) ...[
+            const SizedBox(height: 6),
+            Text(
+              _resetError!,
+              style: const TextStyle(color: Colors.red, fontSize: 12),
+            ),
+          ],
           const SizedBox(height: 22),
           FilledButton(onPressed: _reset, child: const Text('Reset Password')),
         ],

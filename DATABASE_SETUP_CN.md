@@ -1,5 +1,12 @@
 # SafeJalan 双数据库设置
 
+远程Supabase现在包含两个资料表：
+
+- `road_reports`：道路报告
+- `user_profiles`：从SQLite同步的用户公开资料（姓名、邮箱和身份）
+
+安全说明：密码摘要和`AppSettings`登录状态只保存在本机SQLite，不会上传。
+
 ## 1. Local Database：SQLite
 
 SQLite 已经内置，不需要另外注册或配置。
