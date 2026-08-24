@@ -17,42 +17,77 @@ class ProfileScreen extends StatelessWidget {
       child: ListView(
         padding: const EdgeInsets.all(16),
         children: [
-          const SizedBox(height: 8),
-          Center(
-            child: CircleAvatar(
-              radius: 48,
-              backgroundColor: Color(0xFFDDE4FF),
-              backgroundImage:
-                  app.profileImagePath != null &&
-                      File(app.profileImagePath!).existsSync()
-                  ? FileImage(File(app.profileImagePath!))
-                  : null,
-              child:
-                  app.profileImagePath == null ||
-                      !File(app.profileImagePath!).existsSync()
-                  ? const Icon(Icons.person, color: primary, size: 56)
-                  : null,
+          Container(
+            padding: const EdgeInsets.all(22),
+            decoration: BoxDecoration(
+              gradient: const LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: [Color(0xFF253B80), navy],
+              ),
+              borderRadius: BorderRadius.circular(26),
+              boxShadow: const [
+                BoxShadow(
+                  color: Color(0x24101828),
+                  blurRadius: 24,
+                  offset: Offset(0, 12),
+                ),
+              ],
             ),
-          ),
-          const SizedBox(height: 12),
-          Center(
-            child: Text(
-              app.userName,
-              style: const TextStyle(fontSize: 23, fontWeight: FontWeight.bold),
-            ),
-          ),
-          TextButton.icon(
-            onPressed: () => Navigator.push(
-              context,
-              MaterialPageRoute(builder: (_) => const EditProfileScreen()),
-            ),
-            icon: const Icon(Icons.edit_outlined),
-            label: const Text('Edit Profile'),
-          ),
-          Center(
-            child: Text(
-              app.email,
-              style: const TextStyle(color: Colors.blueGrey),
+            child: Column(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(4),
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    border: Border.all(color: Colors.white24, width: 2),
+                  ),
+                  child: CircleAvatar(
+                    radius: 45,
+                    backgroundColor: const Color(0xFFE7ECFF),
+                    backgroundImage:
+                        app.profileImagePath != null &&
+                            File(app.profileImagePath!).existsSync()
+                        ? FileImage(File(app.profileImagePath!))
+                        : null,
+                    child:
+                        app.profileImagePath == null ||
+                            !File(app.profileImagePath!).existsSync()
+                        ? const Icon(Icons.person, color: primary, size: 52)
+                        : null,
+                  ),
+                ),
+                const SizedBox(height: 14),
+                Text(
+                  app.userName,
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 23,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  app.email,
+                  style: const TextStyle(color: Color(0xFFB8C3DC)),
+                ),
+                const SizedBox(height: 12),
+                OutlinedButton.icon(
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: Colors.white,
+                    side: const BorderSide(color: Colors.white24),
+                    minimumSize: const Size(0, 40),
+                  ),
+                  onPressed: () => Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => const EditProfileScreen(),
+                    ),
+                  ),
+                  icon: const Icon(Icons.edit_outlined, size: 18),
+                  label: const Text('Edit Profile'),
+                ),
+              ],
             ),
           ),
           const SizedBox(height: 18),
@@ -71,43 +106,8 @@ class ProfileScreen extends StatelessWidget {
               ),
             ],
           ),
-          const SizedBox(height: 10),
-          Card(
-            child: ListTile(
-              leading: Icon(
-                app.isRemoteConfigured ? Icons.cloud_done : Icons.storage,
-                color: app.lastSyncError == null ? primary : Colors.orange,
-              ),
-              title: Text(
-                app.isRemoteConfigured
-                    ? 'SQLite + Supabase'
-                    : 'SQLite local database',
-              ),
-              subtitle: Text(
-                !app.isRemoteConfigured
-                    ? 'Remote database is not configured.'
-                    : app.lastSyncError == null
-                    ? 'Local and remote reports are synchronized.'
-                    : 'Saved locally. Remote sync will retry.',
-              ),
-              trailing: app.isSyncing
-                  ? const SizedBox(
-                      width: 22,
-                      height: 22,
-                      child: CircularProgressIndicator(strokeWidth: 2),
-                    )
-                  : IconButton(
-                      tooltip: 'Sync now',
-                      onPressed: app.syncReports,
-                      icon: const Icon(Icons.sync),
-                    ),
-            ),
-          ),
           const SizedBox(height: 18),
-          const Text(
-            'Earned Badges',
-            style: TextStyle(fontWeight: FontWeight.bold, fontSize: 17),
-          ),
+          const PageTitle('Earned Badges', 'Your community milestones'),
           const SizedBox(height: 8),
           if (app.myReports.isEmpty)
             const Card(
@@ -133,10 +133,7 @@ class ProfileScreen extends StatelessWidget {
               ],
             ),
           const SizedBox(height: 18),
-          const Text(
-            'Report History',
-            style: TextStyle(fontWeight: FontWeight.bold, fontSize: 17),
-          ),
+          const PageTitle('Report History', 'Your latest submissions'),
           const SizedBox(height: 8),
           ...app.myReports
               .take(3)
@@ -151,7 +148,9 @@ class ProfileScreen extends StatelessWidget {
                   ),
                 ),
               ),
+          const SizedBox(height: 6),
           OutlinedButton.icon(
+            style: OutlinedButton.styleFrom(foregroundColor: Colors.red),
             onPressed: () async {
               await context.read<AppProvider>().logout();
               if (!context.mounted) return;
@@ -177,18 +176,18 @@ class _Metric extends StatelessWidget {
   @override
   Widget build(BuildContext context) => Card(
     child: Padding(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.symmetric(vertical: 18, horizontal: 12),
       child: Column(
         children: [
           Text(
             value,
             style: TextStyle(
               color: color,
-              fontSize: 25,
-              fontWeight: FontWeight.bold,
+              fontSize: 27,
+              fontWeight: FontWeight.w800,
             ),
           ),
-          Text(label, style: const TextStyle(color: Colors.blueGrey)),
+          Text(label, style: const TextStyle(color: mutedText, fontSize: 12)),
         ],
       ),
     ),
@@ -200,13 +199,22 @@ class _Badge extends StatelessWidget {
   final String text;
   const _Badge(this.icon, this.text);
   @override
-  Widget build(BuildContext context) => Column(
-    children: [
-      Icon(icon, color: primary, size: 30),
-      Text(
-        text,
-        style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold),
-      ),
-    ],
+  Widget build(BuildContext context) => Container(
+    margin: const EdgeInsets.symmetric(horizontal: 4),
+    padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 8),
+    decoration: BoxDecoration(
+      color: primary.withValues(alpha: .07),
+      borderRadius: BorderRadius.circular(16),
+    ),
+    child: Column(
+      children: [
+        Icon(icon, color: primary, size: 28),
+        const SizedBox(height: 4),
+        Text(
+          text,
+          style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w700),
+        ),
+      ],
+    ),
   );
 }

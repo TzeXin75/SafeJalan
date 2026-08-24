@@ -2,9 +2,12 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import '../models/report.dart';
 
-const navy = Color(0xFF0F172A);
-const primary = Color(0xFF4361EE);
-const safeBg = Color(0xFFF8FAFC);
+const navy = Color(0xFF101828);
+const primary = Color(0xFF3B5BDB);
+const safeTeal = Color(0xFF12B886);
+const safeBg = Color(0xFFF4F7FC);
+const mutedText = Color(0xFF667085);
+const softBorder = Color(0xFFE4E7EC);
 
 Color severityColor(String value) => switch (value) {
   'Critical' => const Color(0xFFEF4444),
@@ -19,10 +22,11 @@ class LabelBadge extends StatelessWidget {
   const LabelBadge(this.label, this.color, {super.key});
   @override
   Widget build(BuildContext context) => Container(
-    padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
+    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
     decoration: BoxDecoration(
       color: color.withValues(alpha: .12),
-      borderRadius: BorderRadius.circular(30),
+      borderRadius: BorderRadius.circular(999),
+      border: Border.all(color: color.withValues(alpha: .16)),
     ),
     child: Text(
       label,
@@ -37,19 +41,19 @@ class ReportTile extends StatelessWidget {
   const ReportTile({super.key, required this.report, required this.onTap});
   @override
   Widget build(BuildContext context) => Card(
-    margin: const EdgeInsets.only(bottom: 10),
+    margin: const EdgeInsets.only(bottom: 12),
     child: InkWell(
-      borderRadius: BorderRadius.circular(16),
+      borderRadius: BorderRadius.circular(20),
       onTap: onTap,
       child: Padding(
-        padding: const EdgeInsets.all(12),
+        padding: const EdgeInsets.all(14),
         child: Row(
           children: [
             ClipRRect(
-              borderRadius: BorderRadius.circular(12),
+              borderRadius: BorderRadius.circular(15),
               child: SizedBox(
-                width: 72,
-                height: 72,
+                width: 76,
+                height: 76,
                 child:
                     report.imagePath != null &&
                         File(report.imagePath!).existsSync()
@@ -66,7 +70,7 @@ class ReportTile extends StatelessWidget {
                       ),
               ),
             ),
-            const SizedBox(width: 12),
+            const SizedBox(width: 14),
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -89,24 +93,22 @@ class ReportTile extends StatelessWidget {
                     report.title,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(fontWeight: FontWeight.w700),
+                    style: const TextStyle(
+                      fontWeight: FontWeight.w700,
+                      fontSize: 15,
+                      color: navy,
+                    ),
                   ),
                   Text(
                     report.locationName,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(
-                      color: Colors.blueGrey,
-                      fontSize: 12,
-                    ),
+                    style: const TextStyle(color: mutedText, fontSize: 12),
                   ),
                   const SizedBox(height: 3),
                   Text(
                     '${report.votes} verifications',
-                    style: const TextStyle(
-                      color: Colors.blueGrey,
-                      fontSize: 11,
-                    ),
+                    style: const TextStyle(color: mutedText, fontSize: 11),
                   ),
                 ],
               ),
@@ -122,13 +124,114 @@ InputDecoration safeInput(String label, {IconData? icon}) => InputDecoration(
   labelText: label,
   prefixIcon: icon == null ? null : Icon(icon),
   filled: true,
-  fillColor: Colors.white,
+  fillColor: const Color(0xFFFAFBFF),
+  contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 17),
   border: OutlineInputBorder(
-    borderRadius: BorderRadius.circular(14),
-    borderSide: BorderSide.none,
+    borderRadius: BorderRadius.circular(16),
+    borderSide: const BorderSide(color: softBorder),
   ),
   enabledBorder: OutlineInputBorder(
-    borderRadius: BorderRadius.circular(14),
-    borderSide: const BorderSide(color: Color(0xFFE2E8F0)),
+    borderRadius: BorderRadius.circular(16),
+    borderSide: const BorderSide(color: softBorder),
+  ),
+  focusedBorder: OutlineInputBorder(
+    borderRadius: BorderRadius.circular(16),
+    borderSide: const BorderSide(color: primary, width: 1.6),
+  ),
+  errorBorder: OutlineInputBorder(
+    borderRadius: BorderRadius.circular(16),
+    borderSide: const BorderSide(color: Color(0xFFD92D20)),
   ),
 );
+
+class SafeLogo extends StatelessWidget {
+  final double size;
+  final bool dark;
+  const SafeLogo({super.key, this.size = 64, this.dark = false});
+
+  @override
+  Widget build(BuildContext context) => Container(
+    width: size,
+    height: size,
+    decoration: BoxDecoration(
+      gradient: const LinearGradient(
+        begin: Alignment.topLeft,
+        end: Alignment.bottomRight,
+        colors: [Color(0xFF5C7CFA), primary],
+      ),
+      borderRadius: BorderRadius.circular(size * .3),
+      boxShadow: [
+        BoxShadow(
+          color: primary.withValues(alpha: dark ? .34 : .22),
+          blurRadius: 24,
+          offset: const Offset(0, 10),
+        ),
+      ],
+    ),
+    child: Icon(Icons.add_road_rounded, color: Colors.white, size: size * .55),
+  );
+}
+
+class PageTitle extends StatelessWidget {
+  final String title;
+  final String subtitle;
+  final Widget? trailing;
+  const PageTitle(this.title, this.subtitle, {super.key, this.trailing});
+
+  @override
+  Widget build(BuildContext context) => Row(
+    children: [
+      Expanded(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(title, style: Theme.of(context).textTheme.headlineSmall),
+            const SizedBox(height: 4),
+            Text(subtitle, style: const TextStyle(color: mutedText)),
+          ],
+        ),
+      ),
+      trailing ?? const SizedBox.shrink(),
+    ],
+  );
+}
+
+class AuthBackdrop extends StatelessWidget {
+  final Widget child;
+  const AuthBackdrop({super.key, required this.child});
+
+  @override
+  Widget build(BuildContext context) => Container(
+    decoration: const BoxDecoration(
+      gradient: LinearGradient(
+        begin: Alignment.topCenter,
+        end: Alignment.bottomCenter,
+        colors: [Color(0xFFEAF0FF), safeBg, safeBg],
+      ),
+    ),
+    child: child,
+  );
+}
+
+class FormCard extends StatelessWidget {
+  final Widget child;
+  const FormCard({super.key, required this.child});
+
+  @override
+  Widget build(BuildContext context) => Container(
+    padding: const EdgeInsets.all(22),
+    decoration: BoxDecoration(
+      color: Colors.white,
+      borderRadius: BorderRadius.circular(24),
+      border: Border.all(color: softBorder),
+      boxShadow: const [
+        BoxShadow(
+          color: Color(0x0F101828),
+          blurRadius: 24,
+          offset: Offset(0, 10),
+        ),
+      ],
+    ),
+    child: child,
+  );
+}

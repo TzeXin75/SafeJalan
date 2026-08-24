@@ -32,4 +32,12 @@ class UserAccount {
     'imagePath': imagePath,
     'isAdmin': isAdmin ? 1 : 0,
   };
+
+  Map<String, Object?> toRemoteMap() => {
+    'email': email.toLowerCase(),
+    'full_name': name,
+    'is_admin': isAdmin,
+    'avatar_url': imagePath?.startsWith('http') == true ? imagePath : null,
+    'updated_at': DateTime.now().toUtc().toIso8601String(),
+  };
 }
