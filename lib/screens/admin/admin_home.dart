@@ -27,7 +27,28 @@ class _AdminHomeState extends State<AdminHome> {
   @override
   Widget build(BuildContext context) => Scaffold(
     appBar: AppBar(
-      title: const Text('SafeJalan Admin'),
+      toolbarHeight: 68,
+      titleSpacing: 16,
+      title: const Row(
+        children: [
+          SafeMark(size: 42),
+          SizedBox(width: 11),
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text('SafeJalan Admin'),
+              Text(
+                'Operations centre',
+                style: TextStyle(
+                  color: mutedText,
+                  fontSize: 11,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
       actions: [
         IconButton(
           tooltip: 'Logout',
@@ -45,37 +66,48 @@ class _AdminHomeState extends State<AdminHome> {
       ],
     ),
     body: IndexedStack(index: _index, children: _pages),
-    bottomNavigationBar: NavigationBar(
-      selectedIndex: _index,
-      indicatorColor: primary.withValues(alpha: .15),
-      onDestinationSelected: (i) => setState(() => _index = i),
-      destinations: const [
-        NavigationDestination(
-          icon: Icon(Icons.dashboard_outlined),
-          selectedIcon: Icon(Icons.dashboard),
-          label: 'Home',
-        ),
-        NavigationDestination(
-          icon: Icon(Icons.people_outline),
-          selectedIcon: Icon(Icons.people),
-          label: 'Users',
-        ),
-        NavigationDestination(
-          icon: Icon(Icons.report_outlined),
-          selectedIcon: Icon(Icons.report),
-          label: 'Reports',
-        ),
-        NavigationDestination(
-          icon: Icon(Icons.location_on_outlined),
-          selectedIcon: Icon(Icons.location_on),
-          label: 'Heatmap',
-        ),
-        NavigationDestination(
-          icon: Icon(Icons.insights_outlined),
-          selectedIcon: Icon(Icons.insights),
-          label: 'Stats',
-        ),
-      ],
+    bottomNavigationBar: DecoratedBox(
+      decoration: const BoxDecoration(
+        boxShadow: [
+          BoxShadow(
+            color: Color(0x1A0C2745),
+            blurRadius: 24,
+            offset: Offset(0, -5),
+          ),
+        ],
+      ),
+      child: NavigationBar(
+        selectedIndex: _index,
+        indicatorColor: safeOrange.withValues(alpha: .18),
+        onDestinationSelected: (i) => setState(() => _index = i),
+        destinations: const [
+          NavigationDestination(
+            icon: Icon(Icons.dashboard_outlined),
+            selectedIcon: Icon(Icons.dashboard),
+            label: 'Home',
+          ),
+          NavigationDestination(
+            icon: Icon(Icons.people_outline),
+            selectedIcon: Icon(Icons.people),
+            label: 'Users',
+          ),
+          NavigationDestination(
+            icon: Icon(Icons.report_outlined),
+            selectedIcon: Icon(Icons.report),
+            label: 'Reports',
+          ),
+          NavigationDestination(
+            icon: Icon(Icons.location_on_outlined),
+            selectedIcon: Icon(Icons.location_on),
+            label: 'Heatmap',
+          ),
+          NavigationDestination(
+            icon: Icon(Icons.insights_outlined),
+            selectedIcon: Icon(Icons.insights),
+            label: 'Stats',
+          ),
+        ],
+      ),
     ),
   );
 }

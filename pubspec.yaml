@@ -31,3 +31,6 @@ dev_dependencies:
 
 flutter:
   uses-material-design: true
+  assets:
+    - assets/images/safejalan_logo.png
+    - assets/images/safejalan_app_icon.png

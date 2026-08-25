@@ -28,6 +28,8 @@ class SafeJalanApp extends StatelessWidget {
       colorScheme: ColorScheme.fromSeed(
         seedColor: primary,
         primary: primary,
+        secondary: safeOrange,
+        tertiary: safeTeal,
         surface: Colors.white,
       ),
       fontFamily: 'Roboto',
@@ -49,7 +51,8 @@ class SafeJalanApp extends StatelessWidget {
       ),
       cardTheme: CardThemeData(
         color: Colors.white,
-        elevation: 0,
+        elevation: 1,
+        shadowColor: const Color(0x160C2745),
         margin: EdgeInsets.zero,
         shape: RoundedRectangleBorder(
           side: const BorderSide(color: softBorder),
@@ -61,6 +64,7 @@ class SafeJalanApp extends StatelessWidget {
         foregroundColor: navy,
         surfaceTintColor: Colors.transparent,
         elevation: 0,
+        scrolledUnderElevation: 0,
         centerTitle: false,
         titleTextStyle: TextStyle(
           color: navy,
@@ -72,7 +76,8 @@ class SafeJalanApp extends StatelessWidget {
         style: FilledButton.styleFrom(
           backgroundColor: primary,
           foregroundColor: Colors.white,
-          minimumSize: const Size(0, 52),
+          minimumSize: const Size(0, 54),
+          elevation: 0,
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(16),
           ),
@@ -90,9 +95,11 @@ class SafeJalanApp extends StatelessWidget {
         ),
       ),
       navigationBarTheme: NavigationBarThemeData(
-        height: 72,
+        height: 76,
         backgroundColor: Colors.white,
         surfaceTintColor: Colors.transparent,
+        elevation: 10,
+        shadowColor: const Color(0x240C2745),
         indicatorColor: primary.withValues(alpha: .12),
         labelTextStyle: WidgetStateProperty.resolveWith(
           (states) => TextStyle(

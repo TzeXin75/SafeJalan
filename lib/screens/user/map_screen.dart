@@ -17,20 +17,45 @@ class MapScreen extends StatelessWidget {
       child: Column(
         children: [
           Container(
-            color: navy,
-            padding: const EdgeInsets.fromLTRB(16, 12, 16, 14),
+            decoration: const BoxDecoration(
+              gradient: LinearGradient(
+                colors: [navy, Color(0xFF174A76)],
+                begin: Alignment.centerLeft,
+                end: Alignment.centerRight,
+              ),
+            ),
+            padding: const EdgeInsets.fromLTRB(16, 10, 16, 12),
             child: const Row(
               children: [
-                Text(
-                  'SafeJalan',
-                  style: TextStyle(
-                    color: Colors.white,
-                    fontSize: 20,
-                    fontWeight: FontWeight.bold,
-                  ),
+                SafeMark(size: 42),
+                SizedBox(width: 11),
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'SafeJalan',
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontSize: 19,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                    Text(
+                      'Live road safety map',
+                      style: TextStyle(color: Color(0xFFB8CBE0), fontSize: 11),
+                    ),
+                  ],
                 ),
                 Spacer(),
-                Icon(Icons.notifications_none, color: Colors.white),
+                CircleAvatar(
+                  radius: 19,
+                  backgroundColor: Color(0x1FFFFFFF),
+                  child: Icon(
+                    Icons.notifications_none_rounded,
+                    color: Colors.white,
+                    size: 21,
+                  ),
+                ),
               ],
             ),
           ),

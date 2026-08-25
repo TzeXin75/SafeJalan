@@ -78,7 +78,7 @@ class _LoginScreenState extends State<LoginScreen> {
                             size: 36,
                           ),
                         )
-                      : const SafeLogo(size: 68),
+                      : const SafeLogo(size: 116),
                   const SizedBox(height: 20),
                   Text(
                     widget.admin ? 'SafeJalan Admin' : 'Welcome back',
