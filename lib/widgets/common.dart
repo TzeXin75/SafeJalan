@@ -2,10 +2,11 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import '../models/report.dart';
 
-const navy = Color(0xFF101828);
-const primary = Color(0xFF3B5BDB);
+const navy = Color(0xFF0C2745);
+const primary = Color(0xFF174A76);
+const safeOrange = Color(0xFFFF9F1C);
 const safeTeal = Color(0xFF12B886);
-const safeBg = Color(0xFFF4F7FC);
+const safeBg = Color(0xFFF3F7FB);
 const mutedText = Color(0xFF667085);
 const softBorder = Color(0xFFE4E7EC);
 
@@ -40,8 +41,20 @@ class ReportTile extends StatelessWidget {
   final VoidCallback onTap;
   const ReportTile({super.key, required this.report, required this.onTap});
   @override
-  Widget build(BuildContext context) => Card(
-    margin: const EdgeInsets.only(bottom: 12),
+  Widget build(BuildContext context) => Container(
+    margin: const EdgeInsets.only(bottom: 14),
+    decoration: BoxDecoration(
+      color: Colors.white,
+      borderRadius: BorderRadius.circular(22),
+      border: Border.all(color: softBorder.withValues(alpha: .8)),
+      boxShadow: const [
+        BoxShadow(
+          color: Color(0x0D0C2745),
+          blurRadius: 22,
+          offset: Offset(0, 8),
+        ),
+      ],
+    ),
     child: InkWell(
       borderRadius: BorderRadius.circular(20),
       onTap: onTap,
@@ -113,6 +126,8 @@ class ReportTile extends StatelessWidget {
                 ],
               ),
             ),
+            const SizedBox(width: 6),
+            const Icon(Icons.chevron_right_rounded, color: Color(0xFF98A2B3)),
           ],
         ),
       ),
@@ -163,40 +178,19 @@ class SafeLogo extends StatelessWidget {
   );
 }
 
-class HeroBrandMark extends StatelessWidget {
+class SafeMark extends StatelessWidget {
   final double size;
-  const HeroBrandMark({super.key, this.size = 148});
+  const SafeMark({super.key, this.size = 44});
 
   @override
-  Widget build(BuildContext context) => Container(
-    width: size,
-    height: size,
-    padding: EdgeInsets.all(size * .12),
-    decoration: BoxDecoration(
-      shape: BoxShape.circle,
-      gradient: const LinearGradient(
-        begin: Alignment.topLeft,
-        end: Alignment.bottomRight,
-        colors: [Color(0xFFFFFFFF), Color(0xFFEAF2FA)],
-      ),
-      border: Border.all(color: Colors.white, width: 2),
-      boxShadow: [
-        BoxShadow(
-          color: const Color(0xFFFF9F1C).withValues(alpha: .28),
-          blurRadius: 34,
-          spreadRadius: 2,
-        ),
-        const BoxShadow(
-          color: Color(0x33000000),
-          blurRadius: 20,
-          offset: Offset(0, 12),
-        ),
-      ],
-    ),
+  Widget build(BuildContext context) => ClipRRect(
+    borderRadius: BorderRadius.circular(size * .26),
     child: Image.asset(
       'assets/images/safejalan_app_icon.png',
-      fit: BoxFit.contain,
-      semanticLabel: 'SafeJalan symbol',
+      width: size,
+      height: size,
+      fit: BoxFit.cover,
+      semanticLabel: 'SafeJalan app icon',
     ),
   );
 }
@@ -210,6 +204,15 @@ class PageTitle extends StatelessWidget {
   @override
   Widget build(BuildContext context) => Row(
     children: [
+      Container(
+        width: 4,
+        height: 42,
+        decoration: BoxDecoration(
+          color: safeOrange,
+          borderRadius: BorderRadius.circular(99),
+        ),
+      ),
+      const SizedBox(width: 12),
       Expanded(
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
