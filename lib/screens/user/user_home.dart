@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
-import 'map_screen.dart';
-import 'report_form_screen.dart';
-import 'connectivity_screen.dart';
-import 'leaderboard_screen.dart';
-import 'profile_screen.dart';
+import 'map.dart';
+import 'report_form.dart';
+import 'connectivity.dart';
+import 'leaderboard.dart';
+import 'profile.dart';
 import '../../widgets/common.dart';
 
 class UserHome extends StatefulWidget {

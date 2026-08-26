@@ -2,12 +2,12 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../providers/app_provider.dart';
 import '../../widgets/common.dart';
-import '../entry_screen.dart';
-import 'dashboard_screen.dart';
-import 'manage_reports_screen.dart';
-import 'manage_users_screen.dart';
-import 'risk_heatmap_screen.dart';
-import 'statistics_screen.dart';
+import '../entry.dart';
+import 'dashboard.dart';
+import 'manage_reports.dart';
+import 'manage_users.dart';
+import 'risk_heatmap.dart';
+import 'statistics.dart';
 
 class AdminHome extends StatefulWidget {
   const AdminHome({super.key});

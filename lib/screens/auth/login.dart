@@ -5,8 +5,8 @@ import '../../providers/app_provider.dart';
 import '../../widgets/common.dart';
 import '../admin/admin_home.dart';
 import '../user/user_home.dart';
-import 'forgot_password_screen.dart';
-import 'register_screen.dart';
+import 'forgot_password.dart';
+import 'register.dart';
 
 class LoginScreen extends StatefulWidget {
   final bool admin;
@@ -78,7 +78,7 @@ class _LoginScreenState extends State<LoginScreen> {
                             size: 36,
                           ),
                         )
-                      : const SafeLogo(size: 68),
+                      : const SafeLogo(size: 116),
                   const SizedBox(height: 20),
                   Text(
                     widget.admin ? 'SafeJalan Admin' : 'Welcome back',

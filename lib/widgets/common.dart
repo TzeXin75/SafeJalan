@@ -150,25 +150,54 @@ class SafeLogo extends StatelessWidget {
   const SafeLogo({super.key, this.size = 64, this.dark = false});
 
   @override
+  Widget build(BuildContext context) => SizedBox.square(
+    dimension: size,
+    child: Transform.scale(
+      scale: 1.22,
+      child: Image.asset(
+        'assets/images/safejalan_logo.png',
+        fit: BoxFit.cover,
+        semanticLabel: 'SafeJalan logo',
+      ),
+    ),
+  );
+}
+
+class HeroBrandMark extends StatelessWidget {
+  final double size;
+  const HeroBrandMark({super.key, this.size = 148});
+
+  @override
   Widget build(BuildContext context) => Container(
     width: size,
     height: size,
+    padding: EdgeInsets.all(size * .12),
     decoration: BoxDecoration(
+      shape: BoxShape.circle,
       gradient: const LinearGradient(
         begin: Alignment.topLeft,
         end: Alignment.bottomRight,
-        colors: [Color(0xFF5C7CFA), primary],
+        colors: [Color(0xFFFFFFFF), Color(0xFFEAF2FA)],
       ),
-      borderRadius: BorderRadius.circular(size * .3),
+      border: Border.all(color: Colors.white, width: 2),
       boxShadow: [
         BoxShadow(
-          color: primary.withValues(alpha: dark ? .34 : .22),
-          blurRadius: 24,
-          offset: const Offset(0, 10),
+          color: const Color(0xFFFF9F1C).withValues(alpha: .28),
+          blurRadius: 34,
+          spreadRadius: 2,
+        ),
+        const BoxShadow(
+          color: Color(0x33000000),
+          blurRadius: 20,
+          offset: Offset(0, 12),
         ),
       ],
     ),
-    child: Icon(Icons.add_road_rounded, color: Colors.white, size: size * .55),
+    child: Image.asset(
+      'assets/images/safejalan_app_icon.png',
+      fit: BoxFit.contain,
+      semanticLabel: 'SafeJalan symbol',
+    ),
   );
 }
 

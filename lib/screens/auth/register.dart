@@ -55,7 +55,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
               key: _key,
               child: Column(
                 children: [
-                  const SafeLogo(size: 62),
+                  const SafeLogo(size: 108),
                   const SizedBox(height: 18),
                   Text(
                     'Join SafeJalan',

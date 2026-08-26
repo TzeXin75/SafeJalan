@@ -8,7 +8,7 @@ class DashboardScreen extends StatelessWidget {
   const DashboardScreen({super.key});
   @override
   Widget build(BuildContext context) {
-    final reports = context.watch<AppProvider>().reports;
+    final reports = context.watch<AppProvider>().adminVisibleReports;
     final resolved = reports.where((r) => r.status == 'Resolved').length;
     return SafeArea(
       child: ListView(

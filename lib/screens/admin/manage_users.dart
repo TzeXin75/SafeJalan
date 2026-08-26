@@ -5,7 +5,6 @@ import '../../models/user_account.dart';
 import '../../providers/app_provider.dart';
 import '../../services/database_service.dart';
 import '../../services/supabase_service.dart';
-import '../../widgets/common.dart';
 
 class ManageUsersScreen extends StatefulWidget {
   const ManageUsersScreen({super.key});
@@ -27,94 +26,29 @@ class _ManageUsersScreenState extends State<ManageUsersScreen> {
     _users = DatabaseService.instance.getUsers();
   }
 
-  Future<void> _editUser(UserAccount user) async {
-    final key = GlobalKey<FormState>();
-    final name = TextEditingController(text: user.name);
-    final email = TextEditingController(text: user.email);
-    String? databaseError;
-    final saved = await showDialog<bool>(
+  Future<void> _changeRole(UserAccount user) async {
+    final nextRole = user.isAdmin ? 'User' : 'Admin';
+    final confirmed = await showDialog<bool>(
       context: context,
-      builder: (dialogContext) => StatefulBuilder(
-        builder: (context, setDialogState) => AlertDialog(
-          title: const Text('Edit User'),
-          content: Form(
-            key: key,
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                TextFormField(
-                  controller: name,
-                  decoration: safeInput('Full name'),
-                  validator: (value) => (value?.trim().length ?? 0) < 2
-                      ? 'Enter a valid name'
-                      : null,
-                ),
-                const SizedBox(height: 12),
-                TextFormField(
-                  controller: email,
-                  keyboardType: TextInputType.emailAddress,
-                  decoration: safeInput('Email'),
-                  validator: (value) =>
-                      RegExp(r'^[^@]+@[^@]+\.[^@]+$').hasMatch(value ?? '')
-                      ? null
-                      : 'Enter a valid email',
-                ),
-                if (databaseError != null) ...[
-                  const SizedBox(height: 6),
-                  Text(
-                    databaseError!,
-                    style: const TextStyle(color: Colors.red, fontSize: 12),
-                  ),
-                ],
-              ],
-            ),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(dialogContext, false),
-              child: const Text('Cancel'),
-            ),
-            FilledButton(
-              onPressed: () async {
-                setDialogState(() => databaseError = null);
-                if (!key.currentState!.validate()) return;
-                final existing = await DatabaseService.instance.findUserByEmail(
-                  email.text.trim(),
-                );
-                if (existing != null && existing.id != user.id) {
-                  setDialogState(
-                    () => databaseError = 'This email is already registered',
-                  );
-                  return;
-                }
-                await DatabaseService.instance.updateManagedUser(
-                  user.id!,
-                  name.text.trim(),
-                  email.text.trim(),
-                  user.isAdmin,
-                );
-                final updated = await DatabaseService.instance.findUserById(
-                  user.id!,
-                );
-                if (updated != null) {
-                  await _trySyncProfile(updated, previousEmail: user.email);
-                }
-                if (dialogContext.mounted) {
-                  Navigator.pop(dialogContext, true);
-                }
-              },
-              child: const Text('Save'),
-            ),
-          ],
+      builder: (context) => AlertDialog(
+        title: Text('Change to $nextRole?'),
+        content: Text(
+          '${user.name} will ${user.isAdmin ? 'lose' : 'receive'} administrator access.',
         ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('Confirm'),
+          ),
+        ],
       ),
     );
-    name.dispose();
-    email.dispose();
-    if (saved == true && mounted) setState(_reload);
-  }
+    if (confirmed != true) return;
 
-  Future<void> _changeRole(UserAccount user) async {
     await DatabaseService.instance.updateManagedUser(
       user.id!,
       user.name,
@@ -221,30 +155,30 @@ class _ManageUsersScreenState extends State<ManageUsersScreen> {
                           subtitle: Text(user.email),
                           trailing: isCurrentUser
                               ? const Chip(label: Text('You'))
-                              : PopupMenuButton<String>(
-                                  onSelected: (action) {
-                                    if (action == 'edit') _editUser(user);
-                                    if (action == 'role') _changeRole(user);
-                                    if (action == 'delete') _deleteUser(user);
-                                  },
-                                  itemBuilder: (_) => [
-                                    const PopupMenuItem(
-                                      value: 'edit',
-                                      child: Text('Edit user'),
-                                    ),
-                                    PopupMenuItem(
-                                      value: 'role',
-                                      child: Text(
+                              : Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    IconButton(
+                                      tooltip: user.isAdmin
+                                          ? 'Change to User'
+                                          : 'Change to Admin',
+                                      onPressed: () => _changeRole(user),
+                                      icon: Icon(
                                         user.isAdmin
-                                            ? 'Change to User'
-                                            : 'Change to Admin',
+                                            ? Icons.person_outline_rounded
+                                            : Icons
+                                                  .admin_panel_settings_outlined,
+                                        color: user.isAdmin
+                                            ? Colors.blueGrey
+                                            : const Color(0xFF4361EE),
                                       ),
                                     ),
-                                    const PopupMenuItem(
-                                      value: 'delete',
-                                      child: Text(
-                                        'Delete user',
-                                        style: TextStyle(color: Colors.red),
+                                    IconButton(
+                                      tooltip: 'Delete user',
+                                      onPressed: () => _deleteUser(user),
+                                      icon: const Icon(
+                                        Icons.delete_outline_rounded,
+                                        color: Colors.red,
                                       ),
                                     ),
                                   ],

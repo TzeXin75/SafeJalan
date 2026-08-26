@@ -8,6 +8,7 @@ import 'package:intl/intl.dart';
 import 'package:location/location.dart';
 import 'package:latlong2/latlong.dart';
 import 'package:path_provider/path_provider.dart';
+import 'package:permission_handler/permission_handler.dart' as handler;
 import 'package:provider/provider.dart';
 import '../../models/report.dart';
 import '../../providers/app_provider.dart';
@@ -30,7 +31,17 @@ class _ReportFormScreenState extends State<ReportFormScreen> {
   double _lat = 3.1585, _lng = 101.7123;
   bool _locating = false;
   bool _analysingImage = false;
+  bool _permissionGranted = false;
+  bool _gpsEnabled = false;
   String? _aiSuggestion;
+  final Location _location = Location();
+
+  @override
+  void initState() {
+    super.initState();
+    checkStatus();
+  }
+
   @override
   void dispose() {
     _title.dispose();
@@ -117,26 +128,64 @@ class _ReportFormScreenState extends State<ReportFormScreen> {
     return null;
   }
 
+  Future<bool> isPermissionGranted() async {
+    return await handler.Permission.locationWhenInUse.isGranted;
+  }
+
+  Future<bool> isGpsEnabled() async {
+    return await handler.Permission.location.serviceStatus.isEnabled;
+  }
+
+  void checkStatus() async {
+    final permissionGranted = await isPermissionGranted();
+    final gpsEnabled = await isGpsEnabled();
+    if (!mounted) return;
+    setState(() {
+      _permissionGranted = permissionGranted;
+      _gpsEnabled = gpsEnabled;
+    });
+  }
+
+  Future<bool> requestEnableGps() async {
+    if (_gpsEnabled || await isGpsEnabled()) {
+      if (mounted) setState(() => _gpsEnabled = true);
+      return true;
+    }
+    final isGpsActive = await _location.requestService();
+    if (mounted) setState(() => _gpsEnabled = isGpsActive);
+    return isGpsActive;
+  }
+
+  Future<bool> requestLocationPermission() async {
+    final permissionStatus = await handler.Permission.locationWhenInUse
+        .request();
+    final permissionGranted =
+        permissionStatus == handler.PermissionStatus.granted;
+    if (mounted) setState(() => _permissionGranted = permissionGranted);
+    return permissionGranted;
+  }
+
   Future<void> _getLocation() async {
     setState(() => _locating = true);
-    final location = Location();
-    bool enabled =
-        await location.serviceEnabled() || await location.requestService();
-    if (!enabled) {
-      setState(() => _locating = false);
-      return;
-    }
-    var permission = await location.hasPermission();
-    if (permission == PermissionStatus.denied) {
-      permission = await location.requestPermission();
-    }
-    if (permission == PermissionStatus.granted) {
-      final data = await location.getLocation();
+    try {
+      if (!_gpsEnabled &&
+          !(await isGpsEnabled()) &&
+          !(await requestEnableGps())) {
+        return;
+      }
+      if (!_permissionGranted &&
+          !(await isPermissionGranted()) &&
+          !(await requestLocationPermission())) {
+        return;
+      }
+
+      final data = await _location.getLocation();
       _lat = data.latitude ?? _lat;
       _lng = data.longitude ?? _lng;
       await _updateLocationName();
+    } finally {
+      if (mounted) setState(() => _locating = false);
     }
-    if (mounted) setState(() => _locating = false);
   }
 
   Future<void> _updateLocationName() async {

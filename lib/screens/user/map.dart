@@ -5,14 +5,14 @@ import 'package:provider/provider.dart';
 
 import '../../providers/app_provider.dart';
 import '../../widgets/common.dart';
-import 'report_detail_screen.dart';
+import 'report_detail.dart';
 
 class MapScreen extends StatelessWidget {
   const MapScreen({super.key});
 
   @override
   Widget build(BuildContext context) {
-    final reports = context.watch<AppProvider>().reports;
+    final reports = context.watch<AppProvider>().userVisibleReports;
     return SafeArea(
       child: Column(
         children: [

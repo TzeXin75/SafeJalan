@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../widgets/common.dart';
-import 'auth/login_screen.dart';
+import 'auth/login.dart';
 
 class EntryScreen extends StatelessWidget {
   const EntryScreen({super.key});
@@ -29,35 +29,13 @@ class EntryScreen extends StatelessWidget {
               left: -100,
               child: _Glow(size: 230, color: Color(0x2412B886)),
             ),
-            Positioned(
-              top: 12,
-              right: 16,
-              child: TextButton.icon(
-                style: TextButton.styleFrom(
-                  foregroundColor: Colors.white,
-                  backgroundColor: Colors.white.withValues(alpha: .08),
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 14,
-                    vertical: 10,
-                  ),
-                ),
-                icon: const Icon(Icons.admin_panel_settings_outlined, size: 18),
-                label: const Text('Admin'),
-                onPressed: () => Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (_) => const LoginScreen(admin: true),
-                  ),
-                ),
-              ),
-            ),
             Center(
               child: SingleChildScrollView(
                 padding: const EdgeInsets.fromLTRB(24, 72, 24, 28),
                 child: Column(
                   children: [
-                    const SafeLogo(size: 82, dark: true),
-                    const SizedBox(height: 26),
+                    const HeroBrandMark(size: 146),
+                    const SizedBox(height: 24),
                     Container(
                       padding: const EdgeInsets.symmetric(
                         horizontal: 12,
@@ -157,6 +135,28 @@ class EntryScreen extends StatelessWidget {
                       ),
                     ),
                   ],
+                ),
+              ),
+            ),
+            Positioned(
+              top: 12,
+              right: 16,
+              child: TextButton.icon(
+                style: TextButton.styleFrom(
+                  foregroundColor: Colors.white,
+                  backgroundColor: Colors.white.withValues(alpha: .08),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 14,
+                    vertical: 10,
+                  ),
+                ),
+                icon: const Icon(Icons.admin_panel_settings_outlined, size: 18),
+                label: const Text('Admin'),
+                onPressed: () => Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => const LoginScreen(admin: true),
+                  ),
                 ),
               ),
             ),

@@ -9,7 +9,7 @@ class RiskHeatmapScreen extends StatelessWidget {
   const RiskHeatmapScreen({super.key});
   @override
   Widget build(BuildContext context) {
-    final reports = context.watch<AppProvider>().reports;
+    final reports = context.watch<AppProvider>().adminVisibleReports;
     return SafeArea(
       child: Column(
         children: [

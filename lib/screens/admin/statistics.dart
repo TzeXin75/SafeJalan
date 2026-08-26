@@ -7,7 +7,7 @@ class StatisticsScreen extends StatelessWidget {
   const StatisticsScreen({super.key});
   @override
   Widget build(BuildContext context) {
-    final reports = context.watch<AppProvider>().reports;
+    final reports = context.watch<AppProvider>().adminVisibleReports;
     final categories = <String, int>{};
     final severity = <String, int>{};
     for (final report in reports) {
