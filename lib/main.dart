@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'config/supabase_config.dart';
 import 'providers/app_provider.dart';
-import 'screens/entry_screen.dart';
+import 'screens/entry.dart';
 import 'widgets/common.dart';
 
 Future<void> main() async {

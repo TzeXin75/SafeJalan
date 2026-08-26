@@ -64,6 +64,14 @@ class SupabaseService {
         .upsert(user.toRemoteMap(), onConflict: 'email');
   }
 
+  Future<List<Map<String, dynamic>>> getUserProfiles() async {
+    final rows = await _client
+        .from('user_profiles')
+        .select('email, full_name, is_admin')
+        .order('full_name');
+    return rows.map((row) => Map<String, dynamic>.from(row)).toList();
+  }
+
   Future<void> deleteUserProfile(String email) async {
     await _client
         .from('user_profiles')

@@ -5,6 +5,7 @@ import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:crypto/crypto.dart';
 import 'package:flutter/material.dart';
 import 'package:sqflite/sqflite.dart';
+import '../models/leaderboard_entry.dart';
 import '../models/user_account.dart';
 import '../models/report.dart';
 import '../repositories/report_repository.dart';
@@ -29,12 +30,23 @@ class AppProvider extends ChangeNotifier {
   final Set<String> _updatingVerificationIds = <String>{};
 
   bool get isRemoteConfigured => _reportsRepository.isRemoteConfigured;
+  List<RoadReport> get adminVisibleReports => reports
+      .where((report) => report.status.toLowerCase() != 'archived')
+      .toList();
+  List<RoadReport> get userVisibleReports => reports.where((report) {
+    final status = report.status.toLowerCase();
+    return status != 'resolved' && status != 'archived';
+  }).toList();
   List<RoadReport> get myReports => reports
       .where(
         (report) =>
             report.reporterEmail.isEmpty || report.reporterEmail == email,
       )
       .toList();
+  List<RoadReport> get myVisibleReports => myReports.where((report) {
+    final status = report.status.toLowerCase();
+    return status != 'resolved' && status != 'archived';
+  }).toList();
 
   bool hasVerified(RoadReport report) =>
       report.remoteId != null && _verifiedReportIds.contains(report.remoteId);
@@ -249,6 +261,35 @@ class AppProvider extends ChangeNotifier {
     await syncReports();
   }
 
+  Future<void> archiveExpiredResolvedReports() async {
+    final now = DateTime.now().toUtc();
+    final expiredReports = reports.where((report) {
+      if (report.status.toLowerCase() != 'resolved') return false;
+      final resolvedOn =
+          DateTime.tryParse(report.updatedAt) ??
+          DateTime.tryParse(report.createdOn);
+      if (resolvedOn == null) return false;
+      final deleteOn = DateTime.utc(
+        resolvedOn.year,
+        resolvedOn.month + 3,
+        resolvedOn.day,
+        resolvedOn.hour,
+        resolvedOn.minute,
+        resolvedOn.second,
+      );
+      return !now.isBefore(deleteOn);
+    }).toList();
+
+    if (expiredReports.isEmpty) return;
+    for (final report in expiredReports) {
+      await _reportsRepository.updateReport(
+        report.copyWith(status: 'Archived'),
+      );
+    }
+    reports = await _reportsRepository.getLocalReports();
+    notifyListeners();
+  }
+
   Future<void> syncReports() async {
     if (isSyncing) return;
     isSyncing = true;
@@ -257,6 +298,7 @@ class AppProvider extends ChangeNotifier {
     await _syncPendingVerifications();
     lastSyncError = result.error;
     reports = await _reportsRepository.getLocalReports();
+    await archiveExpiredResolvedReports();
     isSyncing = false;
     notifyListeners();
   }
@@ -321,6 +363,68 @@ class AppProvider extends ChangeNotifier {
     } catch (_) {
       // The local SQLite account remains available if the device is offline.
     }
+  }
+
+  Future<List<LeaderboardEntry>> loadLeaderboard() async {
+    final names = <String, String>{};
+    final adminEmails = <String>{};
+
+    if (_supabase.isConfigured) {
+      try {
+        final profiles = await _supabase.getUserProfiles();
+        for (final profile in profiles) {
+          final email = (profile['email'] as String? ?? '')
+              .trim()
+              .toLowerCase();
+          if (email.isEmpty) continue;
+          names[email] = (profile['full_name'] as String? ?? '').trim();
+          if (profile['is_admin'] as bool? ?? false) adminEmails.add(email);
+        }
+      } catch (_) {
+        // Continue with SQLite users and locally available reports offline.
+      }
+    }
+
+    final localUsers = await _database.getUsers();
+    for (final user in localUsers) {
+      final email = user.email.trim().toLowerCase();
+      names[email] = user.name;
+      if (user.isAdmin) adminEmails.add(email);
+    }
+
+    final reportCounts = <String, int>{};
+    final verificationCounts = <String, int>{};
+    for (final report in reports) {
+      final email = report.reporterEmail.trim().toLowerCase();
+      if (email.isEmpty || adminEmails.contains(email)) continue;
+      reportCounts[email] = (reportCounts[email] ?? 0) + 1;
+      verificationCounts[email] =
+          (verificationCounts[email] ?? 0) + report.votes;
+      names.putIfAbsent(email, () => email.split('@').first);
+    }
+
+    final entries = names.entries
+        .where((profile) => !adminEmails.contains(profile.key))
+        .map(
+          (profile) => LeaderboardEntry(
+            name: profile.value.isEmpty
+                ? profile.key.split('@').first
+                : profile.value,
+            email: profile.key,
+            reportCount: reportCounts[profile.key] ?? 0,
+            verificationCount: verificationCounts[profile.key] ?? 0,
+          ),
+        )
+        .toList();
+
+    entries.sort((first, second) {
+      final byPoints = second.points.compareTo(first.points);
+      if (byPoints != 0) return byPoints;
+      final byReports = second.reportCount.compareTo(first.reportCount);
+      if (byReports != 0) return byReports;
+      return first.name.toLowerCase().compareTo(second.name.toLowerCase());
+    });
+    return entries;
   }
 
   int get points =>
