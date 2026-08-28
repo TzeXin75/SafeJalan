@@ -1,3 +1,6 @@
+dont use supabase pulished key
+use secret key
+
 # SafeJalan - Native Flutter Version
 
 This version is rebuilt with native Flutter widgets following **BMIT2073 Practical Flutter 202605**. It does not use WebView, React, or TypeScript.
