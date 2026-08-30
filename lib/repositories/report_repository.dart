@@ -1,8 +1,8 @@
 import 'package:uuid/uuid.dart';
 
-import '../models/report.dart';
-import '../services/database_service.dart';
-import '../services/supabase_service.dart';
+import 'package:safejalan_native/models/report.dart';
+import 'package:safejalan_native/services/database_service.dart';
+import 'package:safejalan_native/services/supabase_service.dart';
 
 class SyncResult {
   final bool remoteEnabled;

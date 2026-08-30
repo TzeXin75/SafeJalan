@@ -1,16 +1,43 @@
 import 'package:path_provider/path_provider.dart';
 import 'package:sqflite/sqflite.dart';
 
-import '../models/connectivity_report.dart';
-import '../models/report.dart';
-import '../models/safety_announcement.dart';
-import '../models/user_account.dart';
+import 'package:safejalan_native/models/connectivity_report.dart';
+import 'package:safejalan_native/models/report.dart';
+import 'package:safejalan_native/models/safety_announcement.dart';
+import 'package:safejalan_native/models/user_account.dart';
 
 class DatabaseService {
   DatabaseService._internal();
 
   static final DatabaseService instance = DatabaseService._internal();
   static Database? _database;
+  static const _legacyAdminEmail = 'admin@safejalan.my';
+  static const _defaultAdmins = [
+    (
+      name: 'Rouyu',
+      email: 'rouyu@safejalan.com',
+      passwordHash:
+          'dfdb0bb0f0df5a02e37e4d44f8641c6979d16015ecbde05dafdb48837a9bb8e6',
+    ),
+    (
+      name: 'Xintong',
+      email: 'xintong@safejalan.com',
+      passwordHash:
+          '90c929a76949ba3fb1c30b76d3fba1b08dca4547bf64ff1218dd13b267aa7375',
+    ),
+    (
+      name: 'Yueshan',
+      email: 'yueshan@safejalan.com',
+      passwordHash:
+          'e88e96f222a162487a916b85eb439308c44d8155355d07507a74903824778d72',
+    ),
+    (
+      name: 'TzeXin',
+      email: 'tzexin@safejalan.com',
+      passwordHash:
+          '47429213bac3e0238cb5bb5b569bd8d669cf8d27175565b045583d6e614ac77c',
+    ),
+  ];
 
   Future<Database> get database async => _database ??= await _initDatabase();
 
@@ -18,7 +45,7 @@ class DatabaseService {
     final directory = await getApplicationDocumentsDirectory();
     return openDatabase(
       '${directory.path}/safejalan.db',
-      version: 8,
+      version: 9,
       onCreate: (db, version) async {
         await _createReportsTable(db);
         await _createUserTables(db);
@@ -54,6 +81,7 @@ class DatabaseService {
           await _createSafetyAnnouncementsTable(db);
         }
         if (oldVersion < 8) await _migrateUsersForOfflineSync(db);
+        if (oldVersion < 9) await _replaceDefaultAdmins(db);
       },
     );
   }
@@ -240,17 +268,7 @@ class DatabaseService {
         settingValue TEXT
       )
     ''');
-    await db.insert('Users', {
-      'name': 'SafeJalan Administrator',
-      'email': 'admin@safejalan.my',
-      // SHA-256 of Admin123. The demo account can be changed later.
-      'passwordHash':
-          '3b612c75a7b5048a435fb6ec81e52ff92d6d795a8b5a9c17070f6a63c97a53b2',
-      'isAdmin': 1,
-      'isActive': 1,
-      'syncStatus': 'pending',
-      'updatedAt': DateTime.now().toUtc().toIso8601String(),
-    }, conflictAlgorithm: ConflictAlgorithm.ignore);
+    await _seedDefaultAdmins(db);
   }
 
   Future<void> _migrateUsersForOfflineSync(Database db) async {
@@ -298,29 +316,45 @@ class DatabaseService {
       'updatedAt': now,
       'syncStatus': 'pending',
     }, where: "updatedAt = ''");
-    await db.insert('Users', {
-      'name': 'SafeJalan Administrator',
-      'email': 'admin@safejalan.my',
-      'passwordHash':
-          '3b612c75a7b5048a435fb6ec81e52ff92d6d795a8b5a9c17070f6a63c97a53b2',
-      'isAdmin': 1,
-      'isActive': 1,
-      'syncStatus': 'pending',
-      'updatedAt': now,
-    }, conflictAlgorithm: ConflictAlgorithm.ignore);
-    await db.update(
+    await _seedDefaultAdmins(db);
+  }
+
+  Future<void> _replaceDefaultAdmins(Database db) async {
+    await db.delete(
       'Users',
-      {
-        'passwordHash':
-            '3b612c75a7b5048a435fb6ec81e52ff92d6d795a8b5a9c17070f6a63c97a53b2',
+      where: 'email = ? COLLATE NOCASE',
+      whereArgs: [_legacyAdminEmail],
+    );
+    await _seedDefaultAdmins(db);
+  }
+
+  Future<void> _seedDefaultAdmins(Database db) async {
+    final now = DateTime.now().toUtc().toIso8601String();
+    for (final admin in _defaultAdmins) {
+      await db.insert('Users', {
+        'name': admin.name,
+        'email': admin.email,
+        'passwordHash': admin.passwordHash,
         'isAdmin': 1,
         'isActive': 1,
         'syncStatus': 'pending',
         'updatedAt': now,
-      },
-      where: "email = ? COLLATE NOCASE AND passwordHash = ''",
-      whereArgs: ['admin@safejalan.my'],
-    );
+      }, conflictAlgorithm: ConflictAlgorithm.ignore);
+      await db.update(
+        'Users',
+        {
+          'name': admin.name,
+          'passwordHash': admin.passwordHash,
+          'isAdmin': 1,
+          'isActive': 1,
+          'syncStatus': 'pending',
+          'updatedAt': now,
+          'previousEmail': null,
+        },
+        where: 'email = ? COLLATE NOCASE',
+        whereArgs: [admin.email],
+      );
+    }
   }
 
   Future<UserAccount?> findUserByEmail(String email) async {

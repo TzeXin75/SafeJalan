@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
-import '../../models/user_account.dart';
-import '../../providers/app_provider.dart';
-import '../../services/database_service.dart';
+import 'package:safejalan_native/models/user_account.dart';
+import 'package:safejalan_native/providers/app_provider.dart';
+import 'package:safejalan_native/services/database_service.dart';
 
 class ManageUsersScreen extends StatefulWidget {
   const ManageUsersScreen({super.key});

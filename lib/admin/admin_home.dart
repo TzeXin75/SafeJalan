@@ -1,13 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import '../../providers/app_provider.dart';
-import '../../widgets/common.dart';
-import '../entry.dart';
-import 'dashboard.dart';
-import 'admin_tools.dart';
-import 'manage_connectivity.dart';
-import 'manage_reports.dart';
-import 'manage_users.dart';
+import 'package:safejalan_native/providers/app_provider.dart';
+import 'package:safejalan_native/widgets/common.dart';
+import 'package:safejalan_native/entry.dart';
+import 'package:safejalan_native/admin/dashboard.dart';
+import 'package:safejalan_native/admin/admin_tools.dart';
+import 'package:safejalan_native/admin/manage_connectivity.dart';
+import 'package:safejalan_native/admin/manage_reports.dart';
+import 'package:safejalan_native/admin/manage_users.dart';
 
 class AdminHome extends StatefulWidget {
   const AdminHome({super.key});

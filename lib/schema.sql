@@ -143,6 +143,32 @@ create policy "prototype_delete_profiles"
 grant select, insert, update, delete on public.user_profiles
   to anon, authenticated;
 
+-- Replace the original demo administrator with the project team accounts.
+delete from public.user_profiles
+where lower(email) = 'admin@safejalan.my';
+
+insert into public.user_profiles
+  (email, full_name, password_hash, is_admin, is_active, updated_at)
+values
+  ('rouyu@safejalan.com', 'Rouyu',
+   'dfdb0bb0f0df5a02e37e4d44f8641c6979d16015ecbde05dafdb48837a9bb8e6',
+   true, true, now()),
+  ('xintong@safejalan.com', 'Xintong',
+   '90c929a76949ba3fb1c30b76d3fba1b08dca4547bf64ff1218dd13b267aa7375',
+   true, true, now()),
+  ('yueshan@safejalan.com', 'Yueshan',
+   'e88e96f222a162487a916b85eb439308c44d8155355d07507a74903824778d72',
+   true, true, now()),
+  ('tzexin@safejalan.com', 'TzeXin',
+   '47429213bac3e0238cb5bb5b569bd8d669cf8d27175565b045583d6e614ac77c',
+   true, true, now())
+on conflict (email) do update set
+  full_name = excluded.full_name,
+  password_hash = excluded.password_hash,
+  is_admin = true,
+  is_active = true,
+  updated_at = excluded.updated_at;
+
 -- One verification per report and user. The composite primary key prevents
 -- the same user from adding a second verification for the same report.
 create table if not exists public.report_verifications (

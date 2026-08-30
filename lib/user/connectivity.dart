@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
-import '../../providers/app_provider.dart';
-import '../../widgets/common.dart';
+import 'package:safejalan_native/providers/app_provider.dart';
+import 'package:safejalan_native/widgets/common.dart';
 
 class ConnectivityScreen extends StatefulWidget {
   const ConnectivityScreen({super.key});
@@ -49,7 +49,8 @@ class _ConnectivityScreenState extends State<ConnectivityScreen> {
     final items = app.connectivityReports
         .where(
           (report) =>
-              report.reporterEmail.toLowerCase() == app.email.toLowerCase(),
+              report.reporterEmail.toLowerCase() == app.email.toLowerCase() &&
+              report.status.toLowerCase() != 'resolved',
         )
         .toList();
     return SafeArea(
@@ -160,7 +161,7 @@ class _ConnectivityScreenState extends State<ConnectivityScreen> {
                         isThreeLine: true,
                         trailing: LabelBadge(
                           item.status,
-                          item.status == 'Resolved' ? Colors.green : primary,
+                          statusColor(item.status),
                         ),
                       ),
                     ),

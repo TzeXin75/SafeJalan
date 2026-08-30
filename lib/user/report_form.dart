@@ -11,9 +11,9 @@ import 'package:latlong2/latlong.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:permission_handler/permission_handler.dart' as handler;
 import 'package:provider/provider.dart';
-import '../../models/report.dart';
-import '../../providers/app_provider.dart';
-import '../../widgets/common.dart';
+import 'package:safejalan_native/models/report.dart';
+import 'package:safejalan_native/providers/app_provider.dart';
+import 'package:safejalan_native/widgets/common.dart';
 
 class ReportFormScreen extends StatefulWidget {
   final VoidCallback onSaved;

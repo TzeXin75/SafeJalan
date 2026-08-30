@@ -1,9 +1,9 @@
 import 'package:supabase_flutter/supabase_flutter.dart';
 
-import '../models/connectivity_report.dart';
-import '../models/report.dart';
-import '../models/safety_announcement.dart';
-import '../models/user_account.dart';
+import 'package:safejalan_native/models/connectivity_report.dart';
+import 'package:safejalan_native/models/report.dart';
+import 'package:safejalan_native/models/safety_announcement.dart';
+import 'package:safejalan_native/models/user_account.dart';
 
 class SupabaseService {
   SupabaseService._internal();

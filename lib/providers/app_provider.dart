@@ -6,14 +6,14 @@ import 'package:crypto/crypto.dart';
 import 'package:flutter/material.dart';
 import 'package:sqflite/sqflite.dart';
 import 'package:uuid/uuid.dart';
-import '../models/connectivity_report.dart';
-import '../models/leaderboard_entry.dart';
-import '../models/user_account.dart';
-import '../models/report.dart';
-import '../models/safety_announcement.dart';
-import '../repositories/report_repository.dart';
-import '../services/database_service.dart';
-import '../services/supabase_service.dart';
+import 'package:safejalan_native/models/connectivity_report.dart';
+import 'package:safejalan_native/models/leaderboard_entry.dart';
+import 'package:safejalan_native/models/user_account.dart';
+import 'package:safejalan_native/models/report.dart';
+import 'package:safejalan_native/models/safety_announcement.dart';
+import 'package:safejalan_native/repositories/report_repository.dart';
+import 'package:safejalan_native/services/database_service.dart';
+import 'package:safejalan_native/services/supabase_service.dart';
 
 class AppProvider extends ChangeNotifier {
   final DatabaseService _database = DatabaseService.instance;
@@ -349,6 +349,12 @@ class AppProvider extends ChangeNotifier {
 
   Future<void> _syncAllUsers() async {
     if (!_supabase.isConfigured) return;
+    const legacyAdminEmail = 'admin@safejalan.my';
+    try {
+      await _supabase.deleteUserProfile(legacyAdminEmail);
+    } catch (error) {
+      debugPrint('[SafeJalan sync] Legacy admin removal failed: $error');
+    }
     final users = await _database.getUsers(includeInactive: true);
     for (final user in users) {
       await _trySyncUser(user);
@@ -356,6 +362,8 @@ class AppProvider extends ChangeNotifier {
     try {
       final profiles = await _supabase.getUserProfiles();
       for (final profile in profiles) {
+        final remoteEmail = (profile['email'] as String? ?? '').toLowerCase();
+        if (remoteEmail == legacyAdminEmail) continue;
         await _database.upsertRemoteUser(UserAccount.fromRemoteMap(profile));
       }
     } catch (error) {
@@ -445,7 +453,7 @@ class AppProvider extends ChangeNotifier {
     await syncConnectivityReports();
   }
 
-  Future<void> updateConnectivityStatus(
+  Future<bool> updateConnectivityStatus(
     ConnectivityReport report,
     String status,
   ) async {
@@ -459,6 +467,8 @@ class AppProvider extends ChangeNotifier {
     connectivityReports = await _database.getConnectivityReports();
     notifyListeners();
     await syncConnectivityReports();
+    final updated = connectivityReports.where((item) => item.id == report.id);
+    return updated.isNotEmpty && updated.first.syncStatus == 'synced';
   }
 
   Future<void> deleteConnectivityReport(ConnectivityReport report) async {
