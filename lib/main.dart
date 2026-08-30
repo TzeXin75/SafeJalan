@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
-
 import 'providers/app_provider.dart';
 import 'screens/entry.dart';
 import 'services/supabase_service.dart';
@@ -9,8 +8,8 @@ import 'widgets/common.dart';
 
 const String supabaseUrl = 'https://ubcunymjqlxqznyuvmey.supabase.co';
 
-// Use the client-safe Legacy anon key from Supabase Dashboard > API Keys.
-// Never place an sb_secret_... or service_role key in a Flutter application.
+// Classroom prototype: follows the lecture example by passing the Supabase
+// secret key through anonKey. Do not reuse this setup for a production app.
 const String supabaseKey = '';
 
 Future<void> main() async {
@@ -19,7 +18,8 @@ Future<void> main() async {
     try {
       await Supabase.initialize(
         url: supabaseUrl,
-        publishableKey: supabaseKey,
+        // ignore: deprecated_member_use
+        anonKey: supabaseKey,
       ).timeout(const Duration(seconds: 8));
       SupabaseService.instance.setInitialisationResult(isConfigured: true);
     } catch (error) {
@@ -31,6 +31,7 @@ Future<void> main() async {
   }
   runApp(
     ChangeNotifierProvider(
+      lazy: false,
       create: (_) => AppProvider()..initialise(),
       child: const SafeJalanApp(),
     ),

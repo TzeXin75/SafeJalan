@@ -59,15 +59,56 @@ create policy "prototype_delete_reports"
 grant select, insert, update, delete on public.road_reports
   to anon, authenticated;
 
--- Public profile mirror for the classroom prototype.
--- Password hashes and per-device login settings are intentionally excluded.
+-- Remove the previous Supabase Auth profile link, if that version of the
+-- classroom project was installed. Existing profile rows are kept.
+drop trigger if exists on_auth_user_created on auth.users;
+drop function if exists public.handle_new_user();
+
+do $$
+begin
+  if exists (
+    select 1
+    from information_schema.columns
+    where table_schema = 'public'
+      and table_name = 'user_profiles'
+      and column_name = 'id'
+  ) then
+    alter table public.user_profiles drop column id cascade;
+  end if;
+end
+$$;
+
+-- Classroom offline-first account mirror. Passwords are stored only as
+-- SHA-256 hashes so the same account can be checked online and offline.
 create table if not exists public.user_profiles (
   email text primary key,
   full_name text not null,
+  password_hash text not null default '',
   is_admin boolean not null default false,
+  is_active boolean not null default true,
   avatar_url text,
   updated_at timestamptz not null default now()
 );
+
+alter table public.user_profiles
+  add column if not exists password_hash text not null default '';
+alter table public.user_profiles
+  add column if not exists is_active boolean not null default true;
+
+alter table public.user_profiles alter column email set not null;
+
+do $$
+begin
+  if not exists (
+    select 1
+    from pg_constraint
+    where conrelid = 'public.user_profiles'::regclass
+      and contype = 'p'
+  ) then
+    alter table public.user_profiles add primary key (email);
+  end if;
+end
+$$;
 
 create index if not exists user_profiles_role_idx
   on public.user_profiles (is_admin);
@@ -235,3 +276,18 @@ create policy "prototype_delete_announcements"
 
 grant select, insert, update, delete on public.safety_announcements
   to anon, authenticated;
+
+-- Classroom prototype access. The lecture uses an sb_secret_ key, which is
+-- evaluated as service_role. PostgreSQL privileges are still required even
+-- though service_role bypasses RLS.
+grant usage on schema public to service_role;
+grant select, insert, update, delete on public.user_profiles
+  to service_role;
+grant select, insert, update, delete on public.road_reports
+  to service_role;
+grant select, insert, update, delete on public.report_verifications
+  to service_role;
+grant select, insert, update, delete on public.connectivity_reports
+  to service_role;
+grant select, insert, update, delete on public.safety_announcements
+  to service_role;
