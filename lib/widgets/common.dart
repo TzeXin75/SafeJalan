@@ -1,6 +1,6 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
-import '../models/report.dart';
+import 'package:safejalan_native/models/report.dart';
 
 const navy = Color(0xFF101828);
 const primary = Color(0xFF3B5BDB);
@@ -15,6 +15,13 @@ Color severityColor(String value) => switch (value) {
   'High' => const Color(0xFFF97316),
   'Medium' => const Color(0xFFFACC15),
   _ => const Color(0xFF22C55E),
+};
+
+Color statusColor(String value) => switch (value.toLowerCase()) {
+  'pending' => safeOrange,
+  'reviewed' => primary,
+  'resolved' => const Color(0xFF16A34A),
+  _ => mutedText,
 };
 
 class LabelBadge extends StatelessWidget {

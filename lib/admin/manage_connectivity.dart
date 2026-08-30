@@ -1,16 +1,27 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
-import '../../models/connectivity_report.dart';
-import '../../providers/app_provider.dart';
-import '../../widgets/common.dart';
+import 'package:safejalan_native/models/connectivity_report.dart';
+import 'package:safejalan_native/providers/app_provider.dart';
+import 'package:safejalan_native/widgets/common.dart';
 
-class ManageConnectivityScreen extends StatelessWidget {
+class ManageConnectivityScreen extends StatefulWidget {
   const ManageConnectivityScreen({super.key});
+
+  @override
+  State<ManageConnectivityScreen> createState() =>
+      _ManageConnectivityScreenState();
+}
+
+class _ManageConnectivityScreenState extends State<ManageConnectivityScreen> {
+  String _filter = 'All';
 
   @override
   Widget build(BuildContext context) {
     final reports = context.watch<AppProvider>().connectivityReports;
+    final visibleReports = _filter == 'All'
+        ? reports
+        : reports.where((report) => report.status == _filter).toList();
     return SafeArea(
       child: RefreshIndicator(
         onRefresh: context.read<AppProvider>().syncConnectivityReports,
@@ -18,18 +29,38 @@ class ManageConnectivityScreen extends StatelessWidget {
           padding: const EdgeInsets.all(16),
           children: [
             PageTitle(
-              'Connectivity (${reports.length})',
+              'Connectivity (${visibleReports.length})',
               'Review mobile signal and Wi-Fi gaps',
             ),
             const SizedBox(height: 14),
-            if (reports.isEmpty)
+            SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              child: Row(
+                children: ['All', 'Pending', 'Reviewed', 'Resolved']
+                    .map(
+                      (status) => Padding(
+                        padding: const EdgeInsets.only(right: 8),
+                        child: ChoiceChip(
+                          label: Text(status),
+                          selected: _filter == status,
+                          onSelected: (_) => setState(() => _filter = status),
+                        ),
+                      ),
+                    )
+                    .toList(),
+              ),
+            ),
+            const SizedBox(height: 14),
+            if (visibleReports.isEmpty)
               const Card(
                 child: Padding(
                   padding: EdgeInsets.all(24),
-                  child: Center(child: Text('No connectivity reports.')),
+                  child: Center(
+                    child: Text('No connectivity reports for this status.'),
+                  ),
                 ),
               ),
-            ...reports.map((report) => _ConnectivityCard(report)),
+            ...visibleReports.map((report) => _ConnectivityCard(report)),
           ],
         ),
       ),
@@ -72,10 +103,7 @@ class _ConnectivityCard extends StatelessWidget {
                   ],
                 ),
               ),
-              LabelBadge(
-                report.status,
-                report.status == 'Resolved' ? Colors.green : primary,
-              ),
+              LabelBadge(report.status, statusColor(report.status)),
             ],
           ),
           const SizedBox(height: 10),
@@ -83,6 +111,11 @@ class _ConnectivityCard extends StatelessWidget {
           const SizedBox(height: 5),
           Text(
             report.reporterEmail,
+            style: const TextStyle(color: mutedText, fontSize: 11),
+          ),
+          const SizedBox(height: 3),
+          Text(
+            'Updated ${_formatDateTime(report.updatedAt)}',
             style: const TextStyle(color: mutedText, fontSize: 11),
           ),
           const SizedBox(height: 10),
@@ -103,11 +136,20 @@ class _ConnectivityCard extends StatelessWidget {
                       child: Text('Resolved'),
                     ),
                   ],
-                  onChanged: (value) {
+                  onChanged: (value) async {
                     if (value != null && value != report.status) {
-                      context.read<AppProvider>().updateConnectivityStatus(
-                        report,
-                        value,
+                      final synced = await context
+                          .read<AppProvider>()
+                          .updateConnectivityStatus(report, value);
+                      if (!context.mounted) return;
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(
+                          content: Text(
+                            synced
+                                ? 'Status updated to $value and synced.'
+                                : 'Status updated to $value. Saved locally and will sync when online.',
+                          ),
+                        ),
                       );
                     }
                   },
@@ -126,6 +168,14 @@ class _ConnectivityCard extends StatelessWidget {
       ),
     ),
   );
+
+  String _formatDateTime(String value) {
+    final parsed = DateTime.tryParse(value)?.toLocal();
+    if (parsed == null) return value;
+    String two(int number) => number.toString().padLeft(2, '0');
+    return '${two(parsed.day)}/${two(parsed.month)}/${parsed.year} '
+        '${two(parsed.hour)}:${two(parsed.minute)}';
+  }
 
   Future<void> _confirmDelete(BuildContext context) async {
     final confirmed = await showDialog<bool>(

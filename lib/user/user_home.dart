@@ -1,10 +1,10 @@
 import 'package:flutter/material.dart';
-import 'map.dart';
-import 'report_form.dart';
-import 'connectivity.dart';
-import 'leaderboard.dart';
-import 'profile.dart';
-import '../../widgets/common.dart';
+import 'package:safejalan_native/user/map.dart';
+import 'package:safejalan_native/user/report_form.dart';
+import 'package:safejalan_native/user/connectivity.dart';
+import 'package:safejalan_native/user/leaderboard.dart';
+import 'package:safejalan_native/user/profile.dart';
+import 'package:safejalan_native/widgets/common.dart';
 
 class UserHome extends StatefulWidget {
   const UserHome({super.key});

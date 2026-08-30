@@ -1,9 +1,9 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import '../../models/report.dart';
-import '../../providers/app_provider.dart';
-import '../../widgets/common.dart';
+import 'package:safejalan_native/models/report.dart';
+import 'package:safejalan_native/providers/app_provider.dart';
+import 'package:safejalan_native/widgets/common.dart';
 
 class ReportDetailScreen extends StatelessWidget {
   final RoadReport report;
