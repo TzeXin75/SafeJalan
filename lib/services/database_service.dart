@@ -1,7 +1,9 @@
 import 'package:path_provider/path_provider.dart';
 import 'package:sqflite/sqflite.dart';
 
+import '../models/connectivity_report.dart';
 import '../models/report.dart';
+import '../models/safety_announcement.dart';
 import '../models/user_account.dart';
 
 class DatabaseService {
@@ -16,11 +18,13 @@ class DatabaseService {
     final directory = await getApplicationDocumentsDirectory();
     return openDatabase(
       '${directory.path}/safejalan.db',
-      version: 5,
+      version: 6,
       onCreate: (db, version) async {
         await _createReportsTable(db);
         await _createUserTables(db);
         await _createVerificationTable(db);
+        await _createConnectivityReportsTable(db);
+        await _createSafetyAnnouncementsTable(db);
       },
       onUpgrade: (db, oldVersion, newVersion) async {
         if (oldVersion < 2) {
@@ -45,6 +49,10 @@ class DatabaseService {
         }
         if (oldVersion < 4) await _createUserTables(db);
         if (oldVersion < 5) await _createVerificationTable(db);
+        if (oldVersion < 6) {
+          await _createConnectivityReportsTable(db);
+          await _createSafetyAnnouncementsTable(db);
+        }
       },
     );
   }
@@ -58,6 +66,42 @@ class DatabaseService {
         syncStatus TEXT NOT NULL DEFAULT 'pending',
         updatedAt TEXT NOT NULL,
         PRIMARY KEY(reportRemoteId, userEmail)
+      )
+    ''');
+  }
+
+  Future<void> _createConnectivityReportsTable(Database db) async {
+    await db.execute('''
+      CREATE TABLE IF NOT EXISTS ConnectivityReports(
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        remoteId TEXT NOT NULL UNIQUE,
+        issueType TEXT NOT NULL,
+        carrier TEXT NOT NULL,
+        notes TEXT NOT NULL,
+        area TEXT NOT NULL,
+        reporterEmail TEXT NOT NULL COLLATE NOCASE,
+        status TEXT NOT NULL,
+        createdAt TEXT NOT NULL,
+        updatedAt TEXT NOT NULL,
+        syncStatus TEXT NOT NULL,
+        isDeleted INTEGER NOT NULL DEFAULT 0
+      )
+    ''');
+  }
+
+  Future<void> _createSafetyAnnouncementsTable(Database db) async {
+    await db.execute('''
+      CREATE TABLE IF NOT EXISTS SafetyAnnouncements(
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        remoteId TEXT NOT NULL UNIQUE,
+        title TEXT NOT NULL,
+        message TEXT NOT NULL,
+        priority TEXT NOT NULL,
+        isActive INTEGER NOT NULL DEFAULT 1,
+        createdAt TEXT NOT NULL,
+        updatedAt TEXT NOT NULL,
+        syncStatus TEXT NOT NULL,
+        isDeleted INTEGER NOT NULL DEFAULT 0
       )
     ''');
   }
@@ -123,6 +167,55 @@ class DatabaseService {
       where: 'reportRemoteId = ? AND userEmail = ? COLLATE NOCASE',
       whereArgs: [reportRemoteId, userEmail],
     );
+  }
+
+  Future<void> mergeRemoteVerifications(
+    List<Map<String, dynamic>> remoteRows,
+  ) async {
+    final db = await database;
+    await db.transaction((txn) async {
+      final localRows = await txn.query('ReportVerifications');
+      final pendingKeys = localRows
+          .where((row) => row['syncStatus'] == 'pending')
+          .map(
+            (row) =>
+                '${row['reportRemoteId']}|${(row['userEmail'] as String).toLowerCase()}',
+          )
+          .toSet();
+      final remoteKeys = remoteRows
+          .map(
+            (row) =>
+                '${row['report_id']}|${(row['user_email'] as String).toLowerCase()}',
+          )
+          .toSet();
+
+      for (final row in localRows) {
+        final key =
+            '${row['reportRemoteId']}|${(row['userEmail'] as String).toLowerCase()}';
+        if (row['syncStatus'] == 'synced' && !remoteKeys.contains(key)) {
+          await txn.delete(
+            'ReportVerifications',
+            where: 'reportRemoteId = ? AND userEmail = ? COLLATE NOCASE',
+            whereArgs: [row['reportRemoteId'], row['userEmail']],
+          );
+        }
+      }
+
+      for (final row in remoteRows) {
+        final email = (row['user_email'] as String).toLowerCase();
+        final key = '${row['report_id']}|$email';
+        if (pendingKeys.contains(key)) continue;
+        await txn.insert('ReportVerifications', {
+          'reportRemoteId': row['report_id'],
+          'userEmail': email,
+          'isDeleted': 0,
+          'syncStatus': 'synced',
+          'updatedAt':
+              row['created_at'] as String? ??
+              DateTime.now().toUtc().toIso8601String(),
+        }, conflictAlgorithm: ConflictAlgorithm.replace);
+      }
+    });
   }
 
   Future<void> _createUserTables(Database db) async {
@@ -397,5 +490,205 @@ class DatabaseService {
 
   Future<void> clearReports() async {
     await (await database).delete('Reports');
+  }
+
+  Future<List<ConnectivityReport>> getConnectivityReports() async {
+    final rows = await (await database).query(
+      'ConnectivityReports',
+      where: 'isDeleted = 0',
+      orderBy: 'createdAt DESC',
+    );
+    return rows.map(ConnectivityReport.fromLocalMap).toList();
+  }
+
+  Future<List<ConnectivityReport>> getPendingConnectivityReports() async {
+    final rows = await (await database).query(
+      'ConnectivityReports',
+      where: "syncStatus = 'pending'",
+    );
+    return rows.map(ConnectivityReport.fromLocalMap).toList();
+  }
+
+  Future<ConnectivityReport> insertConnectivityReport(
+    ConnectivityReport report,
+  ) async {
+    final id = await (await database).insert(
+      'ConnectivityReports',
+      report.toLocalMap(),
+    );
+    return report.copyWith(id: id);
+  }
+
+  Future<void> updateConnectivityReport(ConnectivityReport report) async {
+    await (await database).update(
+      'ConnectivityReports',
+      report.toLocalMap(),
+      where: 'id = ?',
+      whereArgs: [report.id],
+    );
+  }
+
+  Future<void> markConnectivityReportSynced(int id) async {
+    await (await database).update(
+      'ConnectivityReports',
+      {'syncStatus': 'synced'},
+      where: 'id = ?',
+      whereArgs: [id],
+    );
+  }
+
+  Future<void> markConnectivityReportDeleted(ConnectivityReport report) async {
+    await updateConnectivityReport(
+      report.copyWith(
+        isDeleted: true,
+        syncStatus: 'pending',
+        updatedAt: DateTime.now().toUtc().toIso8601String(),
+      ),
+    );
+  }
+
+  Future<void> deleteConnectivityReport(int id) async {
+    await (await database).delete(
+      'ConnectivityReports',
+      where: 'id = ?',
+      whereArgs: [id],
+    );
+  }
+
+  Future<void> upsertRemoteConnectivityReport(ConnectivityReport report) async {
+    final db = await database;
+    final rows = await db.query(
+      'ConnectivityReports',
+      where: 'remoteId = ?',
+      whereArgs: [report.remoteId],
+      limit: 1,
+    );
+    if (rows.isEmpty) {
+      await db.insert('ConnectivityReports', report.toLocalMap());
+      return;
+    }
+    final existing = ConnectivityReport.fromLocalMap(rows.first);
+    if (existing.syncStatus == 'pending') return;
+    await updateConnectivityReport(
+      report.copyWith(id: existing.id, syncStatus: 'synced'),
+    );
+  }
+
+  Future<void> deleteSyncedConnectivityMissingFromRemote(
+    Set<String> remoteIds,
+  ) async {
+    final db = await database;
+    if (remoteIds.isEmpty) {
+      await db.delete('ConnectivityReports', where: "syncStatus = 'synced'");
+      return;
+    }
+    final placeholders = List.filled(remoteIds.length, '?').join(',');
+    await db.delete(
+      'ConnectivityReports',
+      where: "syncStatus = 'synced' AND remoteId NOT IN ($placeholders)",
+      whereArgs: remoteIds.toList(),
+    );
+  }
+
+  Future<List<SafetyAnnouncement>> getSafetyAnnouncements() async {
+    final rows = await (await database).query(
+      'SafetyAnnouncements',
+      where: 'isDeleted = 0',
+      orderBy: 'createdAt DESC',
+    );
+    return rows.map(SafetyAnnouncement.fromLocalMap).toList();
+  }
+
+  Future<List<SafetyAnnouncement>> getPendingSafetyAnnouncements() async {
+    final rows = await (await database).query(
+      'SafetyAnnouncements',
+      where: "syncStatus = 'pending'",
+    );
+    return rows.map(SafetyAnnouncement.fromLocalMap).toList();
+  }
+
+  Future<SafetyAnnouncement> insertSafetyAnnouncement(
+    SafetyAnnouncement announcement,
+  ) async {
+    final id = await (await database).insert(
+      'SafetyAnnouncements',
+      announcement.toLocalMap(),
+    );
+    return announcement.copyWith(id: id);
+  }
+
+  Future<void> updateSafetyAnnouncement(SafetyAnnouncement announcement) async {
+    await (await database).update(
+      'SafetyAnnouncements',
+      announcement.toLocalMap(),
+      where: 'id = ?',
+      whereArgs: [announcement.id],
+    );
+  }
+
+  Future<void> markSafetyAnnouncementSynced(int id) async {
+    await (await database).update(
+      'SafetyAnnouncements',
+      {'syncStatus': 'synced'},
+      where: 'id = ?',
+      whereArgs: [id],
+    );
+  }
+
+  Future<void> markSafetyAnnouncementDeleted(
+    SafetyAnnouncement announcement,
+  ) async {
+    await updateSafetyAnnouncement(
+      announcement.copyWith(
+        isDeleted: true,
+        syncStatus: 'pending',
+        updatedAt: DateTime.now().toUtc().toIso8601String(),
+      ),
+    );
+  }
+
+  Future<void> deleteSafetyAnnouncement(int id) async {
+    await (await database).delete(
+      'SafetyAnnouncements',
+      where: 'id = ?',
+      whereArgs: [id],
+    );
+  }
+
+  Future<void> upsertRemoteSafetyAnnouncement(
+    SafetyAnnouncement announcement,
+  ) async {
+    final db = await database;
+    final rows = await db.query(
+      'SafetyAnnouncements',
+      where: 'remoteId = ?',
+      whereArgs: [announcement.remoteId],
+      limit: 1,
+    );
+    if (rows.isEmpty) {
+      await db.insert('SafetyAnnouncements', announcement.toLocalMap());
+      return;
+    }
+    final existing = SafetyAnnouncement.fromLocalMap(rows.first);
+    if (existing.syncStatus == 'pending') return;
+    await updateSafetyAnnouncement(
+      announcement.copyWith(id: existing.id, syncStatus: 'synced'),
+    );
+  }
+
+  Future<void> deleteSyncedAnnouncementsMissingFromRemote(
+    Set<String> remoteIds,
+  ) async {
+    final db = await database;
+    if (remoteIds.isEmpty) {
+      await db.delete('SafetyAnnouncements', where: "syncStatus = 'synced'");
+      return;
+    }
+    final placeholders = List.filled(remoteIds.length, '?').join(',');
+    await db.delete(
+      'SafetyAnnouncements',
+      where: "syncStatus = 'synced' AND remoteId NOT IN ($placeholders)",
+      whereArgs: remoteIds.toList(),
+    );
   }
 }

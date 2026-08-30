@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
@@ -34,7 +35,19 @@ class _ReportFormScreenState extends State<ReportFormScreen> {
   bool _permissionGranted = false;
   bool _gpsEnabled = false;
   String? _aiSuggestion;
+  String? _imageError;
+  String? _locationMessage;
+  int _analysisRun = 0;
+  int _locationRun = 0;
   final Location _location = Location();
+
+  static final _emojiPattern = RegExp(
+    r'[\u{1F1E6}-\u{1F1FF}\u{1F300}-\u{1FAFF}\u{2600}-\u{27BF}\u{FE0F}]',
+    unicode: true,
+  );
+  static final _letterOrNumberPattern = RegExp(
+    r'[A-Za-z0-9\u00C0-\u024F\u4E00-\u9FFF]',
+  );
 
   @override
   void initState() {
@@ -44,6 +57,8 @@ class _ReportFormScreenState extends State<ReportFormScreen> {
 
   @override
   void dispose() {
+    _analysisRun++;
+    _locationRun++;
     _title.dispose();
     _description.dispose();
     _locationName.dispose();
@@ -58,6 +73,7 @@ class _ReportFormScreenState extends State<ReportFormScreen> {
     if (picked == null) return;
     setState(() {
       _image = File(picked.path);
+      _imageError = null;
       _analysingImage = true;
       _aiSuggestion = null;
     });
@@ -65,15 +81,25 @@ class _ReportFormScreenState extends State<ReportFormScreen> {
   }
 
   Future<void> _detectCategory(String imagePath) async {
+    final analysisRun = ++_analysisRun;
     final labeler = ImageLabeler(
       options: ImageLabelerOptions(confidenceThreshold: .45),
     );
+    Future<void>.delayed(const Duration(seconds: 15), () {
+      if (!mounted || analysisRun != _analysisRun || !_analysingImage) return;
+      setState(() {
+        _analysisRun++;
+        _analysingImage = false;
+        _aiSuggestion =
+            'AI is taking too long. Detection stopped; select a category manually.';
+      });
+    });
     try {
       final labels = await labeler.processImage(
         InputImage.fromFilePath(imagePath),
       );
       final result = _categoryFromLabels(labels);
-      if (!mounted) return;
+      if (!mounted || analysisRun != _analysisRun) return;
       setState(() {
         _analysingImage = false;
         if (result == null) {
@@ -85,7 +111,7 @@ class _ReportFormScreenState extends State<ReportFormScreen> {
         }
       });
     } catch (_) {
-      if (mounted) {
+      if (mounted && analysisRun == _analysisRun) {
         setState(() {
           _analysingImage = false;
           _aiSuggestion = 'AI analysis unavailable. Select manually.';
@@ -111,7 +137,15 @@ class _ReportFormScreenState extends State<ReportFormScreen> {
       'Infrastructure': [
         'bridge',
         'street light',
+        'streetlight',
         'guard rail',
+        'guardrail',
+        'barrier',
+        'utility pole',
+        'lamp post',
+        'sidewalk',
+        'tunnel',
+        'retaining wall',
         'infrastructure',
       ],
       'Flooding': ['flood', 'water', 'puddle', 'rain'],
@@ -126,6 +160,15 @@ class _ReportFormScreenState extends State<ReportFormScreen> {
       }
     }
     return null;
+  }
+
+  void _cancelImageAnalysis() {
+    if (!_analysingImage) return;
+    setState(() {
+      _analysisRun++;
+      _analysingImage = false;
+      _aiSuggestion = 'AI detection cancelled. Select a category manually.';
+    });
   }
 
   Future<bool> isPermissionGranted() async {
@@ -166,25 +209,69 @@ class _ReportFormScreenState extends State<ReportFormScreen> {
   }
 
   Future<void> _getLocation() async {
-    setState(() => _locating = true);
+    if (_locating) {
+      setState(() {
+        _locationRun++;
+        _locating = false;
+        _locationMessage =
+            'GPS detection cancelled. You can retry or adjust the map.';
+      });
+      return;
+    }
+    final locationRun = ++_locationRun;
+    setState(() {
+      _locating = true;
+      _locationMessage = 'Detecting your current location...';
+    });
     try {
       if (!_gpsEnabled &&
           !(await isGpsEnabled()) &&
           !(await requestEnableGps())) {
+        if (mounted && locationRun == _locationRun) {
+          setState(() => _locationMessage = 'GPS service was not enabled.');
+        }
         return;
       }
       if (!_permissionGranted &&
           !(await isPermissionGranted()) &&
           !(await requestLocationPermission())) {
+        if (mounted && locationRun == _locationRun) {
+          setState(
+            () => _locationMessage = 'Location permission was not granted.',
+          );
+        }
         return;
       }
+      if (!mounted || locationRun != _locationRun) return;
 
-      final data = await _location.getLocation();
+      final data = await _location.getLocation().timeout(
+        const Duration(seconds: 15),
+      );
+      if (!mounted || locationRun != _locationRun) return;
       _lat = data.latitude ?? _lat;
       _lng = data.longitude ?? _lng;
       await _updateLocationName();
+      if (mounted && locationRun == _locationRun) {
+        setState(() => _locationMessage = 'Current location detected.');
+      }
+    } on TimeoutException {
+      if (mounted && locationRun == _locationRun) {
+        setState(
+          () => _locationMessage =
+              'GPS timed out. Move near an open area, retry, or adjust the map.',
+        );
+      }
+    } catch (_) {
+      if (mounted && locationRun == _locationRun) {
+        setState(
+          () => _locationMessage =
+              'Unable to detect GPS. Retry or choose the location on the map.',
+        );
+      }
     } finally {
-      if (mounted) setState(() => _locating = false);
+      if (mounted && locationRun == _locationRun) {
+        setState(() => _locating = false);
+      }
     }
   }
 
@@ -321,7 +408,17 @@ class _ReportFormScreenState extends State<ReportFormScreen> {
   }
 
   Future<void> _submit() async {
-    if (!_key.currentState!.validate()) return;
+    String? imageError;
+    if (_image == null) {
+      imageError = 'Please add a report photo';
+    } else if (!await _image!.exists() || await _image!.length() == 0) {
+      imageError = 'The selected image is invalid. Please choose it again';
+    } else if (await _image!.length() > 10 * 1024 * 1024) {
+      imageError = 'The image must be smaller than 10 MB';
+    }
+    if (mounted) setState(() => _imageError = imageError);
+    final formIsValid = _key.currentState!.validate();
+    if (!formIsValid || _imageError != null) return;
     final imagePath = await _saveImage();
     final report = RoadReport(
       title: _title.text.trim(),
@@ -341,6 +438,7 @@ class _ReportFormScreenState extends State<ReportFormScreen> {
     _description.clear();
     setState(() {
       _image = null;
+      _imageError = null;
       _aiSuggestion = null;
       _analysingImage = false;
     });
@@ -350,6 +448,24 @@ class _ReportFormScreenState extends State<ReportFormScreen> {
       );
     }
     widget.onSaved();
+  }
+
+  String? _validateReportText(
+    String? value, {
+    required int minimum,
+    required String fieldName,
+  }) {
+    final text = value?.trim() ?? '';
+    if (text.length < minimum) {
+      return '$fieldName must contain at least $minimum characters';
+    }
+    if (_emojiPattern.hasMatch(text)) {
+      return '$fieldName cannot contain emoji';
+    }
+    if (!_letterOrNumberPattern.hasMatch(text)) {
+      return '$fieldName must include letters or numbers';
+    }
+    return null;
   }
 
   @override
@@ -406,6 +522,16 @@ class _ReportFormScreenState extends State<ReportFormScreen> {
                           ),
                   ),
                 ),
+                if (_imageError != null) ...[
+                  const SizedBox(height: 6),
+                  Text(
+                    _imageError!,
+                    style: const TextStyle(
+                      color: Color(0xFFD92D20),
+                      fontSize: 12,
+                    ),
+                  ),
+                ],
                 if (_analysingImage || _aiSuggestion != null) ...[
                   const SizedBox(height: 10),
                   Container(
@@ -445,6 +571,11 @@ class _ReportFormScreenState extends State<ReportFormScreen> {
                             ),
                           ),
                         ),
+                        if (_analysingImage)
+                          TextButton(
+                            onPressed: _cancelImageAnalysis,
+                            child: const Text('Cancel'),
+                          ),
                       ],
                     ),
                   ),
@@ -452,10 +583,13 @@ class _ReportFormScreenState extends State<ReportFormScreen> {
                 const SizedBox(height: 14),
                 TextFormField(
                   controller: _title,
+                  maxLength: 80,
                   decoration: safeInput('Report title', icon: Icons.title),
-                  validator: (v) => v == null || v.trim().length < 5
-                      ? 'Enter at least 5 characters'
-                      : null,
+                  validator: (value) => _validateReportText(
+                    value,
+                    minimum: 5,
+                    fieldName: 'Title',
+                  ),
                 ),
                 const SizedBox(height: 12),
                 DropdownButtonFormField<String>(
@@ -516,17 +650,11 @@ class _ReportFormScreenState extends State<ReportFormScreen> {
                   children: [
                     Expanded(
                       child: OutlinedButton.icon(
-                        onPressed: _locating ? null : _getLocation,
+                        onPressed: _getLocation,
                         icon: _locating
-                            ? const SizedBox(
-                                width: 16,
-                                height: 16,
-                                child: CircularProgressIndicator(
-                                  strokeWidth: 2,
-                                ),
-                              )
+                            ? const Icon(Icons.close, size: 19)
                             : const Icon(Icons.my_location, size: 19),
-                        label: const Text('Detect GPS'),
+                        label: Text(_locating ? 'Cancel GPS' : 'Detect GPS'),
                       ),
                     ),
                     const SizedBox(width: 10),
@@ -539,6 +667,15 @@ class _ReportFormScreenState extends State<ReportFormScreen> {
                     ),
                   ],
                 ),
+                if (_locationMessage != null)
+                  Padding(
+                    padding: const EdgeInsets.only(top: 7),
+                    child: Text(
+                      _locationMessage!,
+                      textAlign: TextAlign.center,
+                      style: const TextStyle(color: mutedText, fontSize: 11),
+                    ),
+                  ),
                 Padding(
                   padding: const EdgeInsets.only(top: 5, bottom: 8),
                   child: Text(
@@ -550,10 +687,13 @@ class _ReportFormScreenState extends State<ReportFormScreen> {
                 TextFormField(
                   controller: _description,
                   maxLines: 4,
+                  maxLength: 500,
                   decoration: safeInput('Description'),
-                  validator: (v) => v == null || v.trim().length < 10
-                      ? 'Describe the problem in at least 10 characters'
-                      : null,
+                  validator: (value) => _validateReportText(
+                    value,
+                    minimum: 10,
+                    fieldName: 'Description',
+                  ),
                 ),
                 const SizedBox(height: 18),
                 FilledButton(

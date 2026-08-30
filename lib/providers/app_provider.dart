@@ -5,9 +5,12 @@ import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:crypto/crypto.dart';
 import 'package:flutter/material.dart';
 import 'package:sqflite/sqflite.dart';
+import 'package:uuid/uuid.dart';
+import '../models/connectivity_report.dart';
 import '../models/leaderboard_entry.dart';
 import '../models/user_account.dart';
 import '../models/report.dart';
+import '../models/safety_announcement.dart';
 import '../repositories/report_repository.dart';
 import '../services/database_service.dart';
 import '../services/supabase_service.dart';
@@ -16,7 +19,10 @@ class AppProvider extends ChangeNotifier {
   final DatabaseService _database = DatabaseService.instance;
   final ReportRepository _reportsRepository = ReportRepository();
   final SupabaseService _supabase = SupabaseService.instance;
+  static const _uuid = Uuid();
   List<RoadReport> reports = [];
+  List<ConnectivityReport> connectivityReports = [];
+  List<SafetyAnnouncement> announcements = [];
   String userName = 'New User';
   String email = '';
   String? profileImagePath;
@@ -47,6 +53,8 @@ class AppProvider extends ChangeNotifier {
     final status = report.status.toLowerCase();
     return status != 'resolved' && status != 'archived';
   }).toList();
+  List<SafetyAnnouncement> get activeAnnouncements =>
+      announcements.where((announcement) => announcement.isActive).toList();
 
   bool hasVerified(RoadReport report) =>
       report.remoteId != null && _verifiedReportIds.contains(report.remoteId);
@@ -69,10 +77,14 @@ class AppProvider extends ChangeNotifier {
       await _loadVerifications();
     }
     reports = await _reportsRepository.getLocalReports();
+    connectivityReports = await _database.getConnectivityReports();
+    announcements = await _database.getSafetyAnnouncements();
     await _startConnectivityListener();
     isLoading = false;
     notifyListeners();
     await syncReports();
+    await syncConnectivityReports();
+    await syncSafetyAnnouncements();
     await _syncAllUsers();
   }
 
@@ -335,6 +347,13 @@ class AppProvider extends ChangeNotifier {
         // Leave this row pending so the next reconnect can retry it.
       }
     }
+    try {
+      final remoteRows = await _supabase.getVerifications();
+      await _database.mergeRemoteVerifications(remoteRows);
+      if (email.isNotEmpty) await _loadVerifications();
+    } catch (_) {
+      // Keep local verification state if the remote table is unavailable.
+    }
   }
 
   Future<void> _startConnectivityListener() async {
@@ -353,7 +372,166 @@ class AppProvider extends ChangeNotifier {
 
   Future<void> _retryPendingData() async {
     await syncReports();
+    await syncConnectivityReports();
+    await syncSafetyAnnouncements();
     await _syncAllUsers();
+  }
+
+  Future<void> addConnectivityReport({
+    required String issueType,
+    required String carrier,
+    required String notes,
+    required String area,
+  }) async {
+    final now = DateTime.now().toUtc().toIso8601String();
+    await _database.insertConnectivityReport(
+      ConnectivityReport(
+        remoteId: _uuid.v4(),
+        issueType: issueType,
+        carrier: carrier,
+        notes: notes,
+        area: area,
+        reporterEmail: email,
+        createdAt: now,
+        updatedAt: now,
+      ),
+    );
+    connectivityReports = await _database.getConnectivityReports();
+    notifyListeners();
+    await syncConnectivityReports();
+  }
+
+  Future<void> updateConnectivityStatus(
+    ConnectivityReport report,
+    String status,
+  ) async {
+    await _database.updateConnectivityReport(
+      report.copyWith(
+        status: status,
+        updatedAt: DateTime.now().toUtc().toIso8601String(),
+        syncStatus: 'pending',
+      ),
+    );
+    connectivityReports = await _database.getConnectivityReports();
+    notifyListeners();
+    await syncConnectivityReports();
+  }
+
+  Future<void> deleteConnectivityReport(ConnectivityReport report) async {
+    if (report.id == null) return;
+    await _database.markConnectivityReportDeleted(report);
+    connectivityReports = await _database.getConnectivityReports();
+    notifyListeners();
+    await syncConnectivityReports();
+  }
+
+  Future<void> syncConnectivityReports() async {
+    if (!_supabase.isConfigured) return;
+    try {
+      final pending = await _database.getPendingConnectivityReports();
+      for (final report in pending) {
+        if (report.id == null) continue;
+        if (report.isDeleted) {
+          await _supabase.deleteConnectivityReport(report.remoteId);
+          await _database.deleteConnectivityReport(report.id!);
+        } else {
+          await _supabase.upsertConnectivityReport(report);
+          await _database.markConnectivityReportSynced(report.id!);
+        }
+      }
+      final remoteReports = await _supabase.getConnectivityReports();
+      final remoteIds = <String>{};
+      for (final report in remoteReports) {
+        remoteIds.add(report.remoteId);
+        await _database.upsertRemoteConnectivityReport(report);
+      }
+      await _database.deleteSyncedConnectivityMissingFromRemote(remoteIds);
+      connectivityReports = await _database.getConnectivityReports();
+      notifyListeners();
+    } catch (_) {
+      // SQLite remains available; pending changes retry after reconnect.
+    }
+  }
+
+  Future<void> addSafetyAnnouncement({
+    required String title,
+    required String message,
+    required String priority,
+    required bool isActive,
+  }) async {
+    final now = DateTime.now().toUtc().toIso8601String();
+    await _database.insertSafetyAnnouncement(
+      SafetyAnnouncement(
+        remoteId: _uuid.v4(),
+        title: title,
+        message: message,
+        priority: priority,
+        isActive: isActive,
+        createdAt: now,
+        updatedAt: now,
+      ),
+    );
+    announcements = await _database.getSafetyAnnouncements();
+    notifyListeners();
+    await syncSafetyAnnouncements();
+  }
+
+  Future<void> updateSafetyAnnouncement(
+    SafetyAnnouncement announcement, {
+    required String title,
+    required String message,
+    required String priority,
+    required bool isActive,
+  }) async {
+    await _database.updateSafetyAnnouncement(
+      announcement.copyWith(
+        title: title,
+        message: message,
+        priority: priority,
+        isActive: isActive,
+        updatedAt: DateTime.now().toUtc().toIso8601String(),
+        syncStatus: 'pending',
+      ),
+    );
+    announcements = await _database.getSafetyAnnouncements();
+    notifyListeners();
+    await syncSafetyAnnouncements();
+  }
+
+  Future<void> deleteSafetyAnnouncement(SafetyAnnouncement announcement) async {
+    if (announcement.id == null) return;
+    await _database.markSafetyAnnouncementDeleted(announcement);
+    announcements = await _database.getSafetyAnnouncements();
+    notifyListeners();
+    await syncSafetyAnnouncements();
+  }
+
+  Future<void> syncSafetyAnnouncements() async {
+    if (!_supabase.isConfigured) return;
+    try {
+      final pending = await _database.getPendingSafetyAnnouncements();
+      for (final announcement in pending) {
+        if (announcement.id == null) continue;
+        if (announcement.isDeleted) {
+          await _supabase.deleteSafetyAnnouncement(announcement.remoteId);
+          await _database.deleteSafetyAnnouncement(announcement.id!);
+        } else {
+          await _supabase.upsertSafetyAnnouncement(announcement);
+          await _database.markSafetyAnnouncementSynced(announcement.id!);
+        }
+      }
+      final remoteAnnouncements = await _supabase.getSafetyAnnouncements();
+      final remoteIds = <String>{};
+      for (final announcement in remoteAnnouncements) {
+        remoteIds.add(announcement.remoteId);
+        await _database.upsertRemoteSafetyAnnouncement(announcement);
+      }
+      await _database.deleteSyncedAnnouncementsMissingFromRemote(remoteIds);
+      announcements = await _database.getSafetyAnnouncements();
+      notifyListeners();
+    } catch (_) {
+      // SQLite remains available; pending changes retry after reconnect.
+    }
   }
 
   Future<void> _trySyncUser(UserAccount user, {String? previousEmail}) async {

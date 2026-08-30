@@ -188,17 +188,20 @@ class _LoginScreenState extends State<LoginScreen> {
                         ),
                         TextButton(
                           onPressed: () async {
-                            final success = await Navigator.push<bool>(
-                              context,
-                              MaterialPageRoute(
-                                builder: (_) => const RegisterScreen(),
-                              ),
-                            );
-                            if (success == true && mounted) {
+                            final result =
+                                await Navigator.push<RegistrationResult>(
+                                  context,
+                                  MaterialPageRoute(
+                                    builder: (_) => const RegisterScreen(),
+                                  ),
+                                );
+                            if (result != null && mounted) {
                               setState(() {
+                                _email.text = result.email;
+                                _password.text = result.password;
                                 _loginError = null;
                                 _successMessage =
-                                    'Registration successful. Please log in.';
+                                    'Registration successful. Your login details are ready.';
                               });
                             }
                           },

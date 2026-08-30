@@ -4,10 +4,10 @@ import '../../providers/app_provider.dart';
 import '../../widgets/common.dart';
 import '../entry.dart';
 import 'dashboard.dart';
+import 'admin_tools.dart';
+import 'manage_connectivity.dart';
 import 'manage_reports.dart';
 import 'manage_users.dart';
-import 'risk_heatmap.dart';
-import 'statistics.dart';
 
 class AdminHome extends StatefulWidget {
   const AdminHome({super.key});
@@ -21,8 +21,8 @@ class _AdminHomeState extends State<AdminHome> {
     DashboardScreen(),
     ManageUsersScreen(),
     ManageReportsScreen(),
-    RiskHeatmapScreen(),
-    StatisticsScreen(),
+    ManageConnectivityScreen(),
+    AdminToolsScreen(),
   ];
   @override
   Widget build(BuildContext context) => Scaffold(
@@ -97,14 +97,14 @@ class _AdminHomeState extends State<AdminHome> {
             label: 'Reports',
           ),
           NavigationDestination(
-            icon: Icon(Icons.location_on_outlined),
-            selectedIcon: Icon(Icons.location_on),
-            label: 'Heatmap',
+            icon: Icon(Icons.wifi_off_outlined),
+            selectedIcon: Icon(Icons.wifi_off_rounded),
+            label: 'Network',
           ),
           NavigationDestination(
-            icon: Icon(Icons.insights_outlined),
-            selectedIcon: Icon(Icons.insights),
-            label: 'Stats',
+            icon: Icon(Icons.grid_view_outlined),
+            selectedIcon: Icon(Icons.grid_view_rounded),
+            label: 'More',
           ),
         ],
       ),

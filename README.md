@@ -42,23 +42,23 @@ The APK will be written to `build/app/outputs/flutter-apk/app-debug.apk`.
 - Practical 4: `Navigator`, `MaterialPageRoute`, and passing report objects.
 - Practical 5: Provider, `ChangeNotifier` and `notifyListeners`.
 - Practical 6: `Form`, validators, dropdowns and choice chips.
-- Practical 7: SharedPreferences for profile and login state.
+- Practical 9: SQLite for accounts, login state and offline application data.
 - Practical 8: image_picker, path_provider and `Image.file`.
-- Practical 9: SQLite CRUD for persistent road reports.
+- Practical 9: SQLite CRUD for road reports, connectivity reports and safety announcements.
 - Practical 11: Supabase remote CRUD and synchronization.
 - Practical 12: flutter_map and OpenStreetMap markers.
 - Practical 13: location permissions and device GPS.
 
 ## Structure
 
-- `lib/models` - report model.
+- `lib/models` - road report, connectivity, announcement and account models.
 - `lib/providers` - shared application state.
 - `lib/config` - Supabase build-time configuration.
 - `lib/services` - SQLite and Supabase database operations.
 - `lib/repositories` - local-first report synchronization.
 - `lib/screens/auth` - validated login and registration.
-- `lib/screens/user` - map, reporting, connectivity, leaderboard and profile.
-- `lib/screens/admin` - dashboard, management, heatmap and statistics.
+- `lib/screens/user` - map, reporting, announcements, connectivity, leaderboard and profile.
+- `lib/screens/admin` - dashboard, user/report/connectivity/announcement management, heatmap and statistics.
 - `lib/widgets` - reusable Flutter widgets.
 
 Authentication is currently a classroom prototype. Road reports use SQLite as the offline local database and Supabase as the optional remote database.
@@ -91,6 +91,8 @@ If the configuration is omitted, SafeJalan continues to work with SQLite only. T
 - Unsynced records are marked `pending`.
 - When Supabase is configured, pending records upload automatically.
 - On startup and after CRUD operations, remote rows are downloaded into SQLite.
+- Verification rows are downloaded so a user's Still Exists state is restored on another device.
+- Connectivity reports and safety announcements follow the same local-first sync flow.
 - Failed remote requests stay safely in SQLite and retry on the next sync.
 - Profile shows whether the app is using SQLite only or SQLite + Supabase, and includes a manual Sync button.
 
