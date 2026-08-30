@@ -1,7 +1,9 @@
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../config/supabase_config.dart';
+import '../models/connectivity_report.dart';
 import '../models/report.dart';
+import '../models/safety_announcement.dart';
 import '../models/user_account.dart';
 
 class SupabaseService {
@@ -49,6 +51,49 @@ class SupabaseService {
         .delete()
         .eq('report_id', reportId)
         .eq('user_email', userEmail.toLowerCase());
+  }
+
+  Future<List<Map<String, dynamic>>> getVerifications() async {
+    final rows = await _client
+        .from('report_verifications')
+        .select('report_id, user_email, created_at');
+    return rows.map((row) => Map<String, dynamic>.from(row)).toList();
+  }
+
+  Future<List<ConnectivityReport>> getConnectivityReports() async {
+    final rows = await _client
+        .from('connectivity_reports')
+        .select()
+        .order('created_at', ascending: false);
+    return rows.map(ConnectivityReport.fromRemoteMap).toList();
+  }
+
+  Future<void> upsertConnectivityReport(ConnectivityReport report) async {
+    await _client
+        .from('connectivity_reports')
+        .upsert(report.toRemoteMap(), onConflict: 'id');
+  }
+
+  Future<void> deleteConnectivityReport(String remoteId) async {
+    await _client.from('connectivity_reports').delete().eq('id', remoteId);
+  }
+
+  Future<List<SafetyAnnouncement>> getSafetyAnnouncements() async {
+    final rows = await _client
+        .from('safety_announcements')
+        .select()
+        .order('created_at', ascending: false);
+    return rows.map(SafetyAnnouncement.fromRemoteMap).toList();
+  }
+
+  Future<void> upsertSafetyAnnouncement(SafetyAnnouncement announcement) async {
+    await _client
+        .from('safety_announcements')
+        .upsert(announcement.toRemoteMap(), onConflict: 'id');
+  }
+
+  Future<void> deleteSafetyAnnouncement(String remoteId) async {
+    await _client.from('safety_announcements').delete().eq('id', remoteId);
   }
 
   Future<void> upsertUserProfile(

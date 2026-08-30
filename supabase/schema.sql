@@ -147,3 +147,91 @@ create policy "prototype_delete_verifications"
 
 grant select, insert, update, delete on public.report_verifications
   to anon, authenticated;
+
+-- Connectivity reports submitted by users and managed by administrators.
+create table if not exists public.connectivity_reports (
+  id uuid primary key default gen_random_uuid(),
+  issue_type text not null,
+  carrier text not null,
+  notes text not null default '',
+  area text not null,
+  reporter_email text not null default '',
+  status text not null default 'Pending',
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
+create index if not exists connectivity_reports_created_at_idx
+  on public.connectivity_reports (created_at desc);
+
+alter table public.connectivity_reports enable row level security;
+
+drop policy if exists "prototype_read_connectivity"
+  on public.connectivity_reports;
+create policy "prototype_read_connectivity"
+  on public.connectivity_reports for select
+  to anon, authenticated using (true);
+
+drop policy if exists "prototype_insert_connectivity"
+  on public.connectivity_reports;
+create policy "prototype_insert_connectivity"
+  on public.connectivity_reports for insert
+  to anon, authenticated with check (true);
+
+drop policy if exists "prototype_update_connectivity"
+  on public.connectivity_reports;
+create policy "prototype_update_connectivity"
+  on public.connectivity_reports for update
+  to anon, authenticated using (true) with check (true);
+
+drop policy if exists "prototype_delete_connectivity"
+  on public.connectivity_reports;
+create policy "prototype_delete_connectivity"
+  on public.connectivity_reports for delete
+  to anon, authenticated using (true);
+
+grant select, insert, update, delete on public.connectivity_reports
+  to anon, authenticated;
+
+-- Safety notices: administrators perform CRUD; users read active rows in-app.
+create table if not exists public.safety_announcements (
+  id uuid primary key default gen_random_uuid(),
+  title text not null,
+  message text not null,
+  priority text not null default 'Normal',
+  is_active boolean not null default true,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
+create index if not exists safety_announcements_created_at_idx
+  on public.safety_announcements (created_at desc);
+
+alter table public.safety_announcements enable row level security;
+
+drop policy if exists "prototype_read_announcements"
+  on public.safety_announcements;
+create policy "prototype_read_announcements"
+  on public.safety_announcements for select
+  to anon, authenticated using (true);
+
+drop policy if exists "prototype_insert_announcements"
+  on public.safety_announcements;
+create policy "prototype_insert_announcements"
+  on public.safety_announcements for insert
+  to anon, authenticated with check (true);
+
+drop policy if exists "prototype_update_announcements"
+  on public.safety_announcements;
+create policy "prototype_update_announcements"
+  on public.safety_announcements for update
+  to anon, authenticated using (true) with check (true);
+
+drop policy if exists "prototype_delete_announcements"
+  on public.safety_announcements;
+create policy "prototype_delete_announcements"
+  on public.safety_announcements for delete
+  to anon, authenticated using (true);
+
+grant select, insert, update, delete on public.safety_announcements
+  to anon, authenticated;

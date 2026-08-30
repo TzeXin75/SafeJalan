@@ -5,6 +5,7 @@ import '../models/report.dart';
 const navy = Color(0xFF101828);
 const primary = Color(0xFF3B5BDB);
 const safeTeal = Color(0xFF12B886);
+const safeOrange = Color(0xFFFF9F1C);
 const safeBg = Color(0xFFF4F7FC);
 const mutedText = Color(0xFF667085);
 const softBorder = Color(0xFFE4E7EC);
@@ -159,6 +160,21 @@ class SafeLogo extends StatelessWidget {
         fit: BoxFit.cover,
         semanticLabel: 'SafeJalan logo',
       ),
+    ),
+  );
+}
+
+class SafeMark extends StatelessWidget {
+  final double size;
+  const SafeMark({super.key, this.size = 42});
+
+  @override
+  Widget build(BuildContext context) => SizedBox.square(
+    dimension: size,
+    child: Image.asset(
+      'assets/images/safejalan_app_icon.png',
+      fit: BoxFit.contain,
+      semanticLabel: 'SafeJalan symbol',
     ),
   );
 }

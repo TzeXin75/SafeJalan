@@ -5,6 +5,7 @@ import 'package:provider/provider.dart';
 
 import '../../providers/app_provider.dart';
 import '../../widgets/common.dart';
+import 'announcements.dart';
 import 'report_detail.dart';
 
 class MapScreen extends StatelessWidget {
@@ -13,6 +14,10 @@ class MapScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final reports = context.watch<AppProvider>().userVisibleReports;
+    final announcementCount = context
+        .watch<AppProvider>()
+        .activeAnnouncements
+        .length;
     return SafeArea(
       child: Column(
         children: [
@@ -25,11 +30,11 @@ class MapScreen extends StatelessWidget {
               ),
             ),
             padding: const EdgeInsets.fromLTRB(16, 10, 16, 12),
-            child: const Row(
+            child: Row(
               children: [
-                SafeMark(size: 42),
-                SizedBox(width: 11),
-                Column(
+                const SafeMark(size: 42),
+                const SizedBox(width: 11),
+                const Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
@@ -46,15 +51,42 @@ class MapScreen extends StatelessWidget {
                     ),
                   ],
                 ),
-                Spacer(),
-                CircleAvatar(
-                  radius: 19,
-                  backgroundColor: Color(0x1FFFFFFF),
-                  child: Icon(
-                    Icons.notifications_none_rounded,
-                    color: Colors.white,
-                    size: 21,
-                  ),
+                const Spacer(),
+                Stack(
+                  clipBehavior: Clip.none,
+                  children: [
+                    IconButton.filledTonal(
+                      tooltip: 'Safety announcements',
+                      style: IconButton.styleFrom(
+                        backgroundColor: const Color(0x1FFFFFFF),
+                        foregroundColor: Colors.white,
+                      ),
+                      onPressed: () => Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => const AnnouncementsScreen(),
+                        ),
+                      ),
+                      icon: const Icon(Icons.notifications_none_rounded),
+                    ),
+                    if (announcementCount > 0)
+                      Positioned(
+                        top: -2,
+                        right: -2,
+                        child: CircleAvatar(
+                          radius: 9,
+                          backgroundColor: Colors.red,
+                          child: Text(
+                            announcementCount > 9 ? '9+' : '$announcementCount',
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 9,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ),
+                      ),
+                  ],
                 ),
               ],
             ),
