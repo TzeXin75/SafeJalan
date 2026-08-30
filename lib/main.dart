@@ -1,13 +1,34 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import 'config/supabase_config.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
+
 import 'providers/app_provider.dart';
 import 'screens/entry.dart';
+import 'services/supabase_service.dart';
 import 'widgets/common.dart';
+
+const String supabaseUrl = 'https://ubcunymjqlxqznyuvmey.supabase.co';
+
+// Use the client-safe Legacy anon key from Supabase Dashboard > API Keys.
+// Never place an sb_secret_... or service_role key in a Flutter application.
+const String supabaseKey = '';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  await SupabaseConfig.initialise();
+  if (supabaseUrl.trim().isNotEmpty && supabaseKey.trim().isNotEmpty) {
+    try {
+      await Supabase.initialize(
+        url: supabaseUrl,
+        publishableKey: supabaseKey,
+      ).timeout(const Duration(seconds: 8));
+      SupabaseService.instance.setInitialisationResult(isConfigured: true);
+    } catch (error) {
+      SupabaseService.instance.setInitialisationResult(
+        isConfigured: false,
+        error: error.toString(),
+      );
+    }
+  }
   runApp(
     ChangeNotifierProvider(
       create: (_) => AppProvider()..initialise(),

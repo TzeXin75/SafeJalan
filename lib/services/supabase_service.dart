@@ -1,6 +1,5 @@
 import 'package:supabase_flutter/supabase_flutter.dart';
 
-import '../config/supabase_config.dart';
 import '../models/connectivity_report.dart';
 import '../models/report.dart';
 import '../models/safety_announcement.dart';
@@ -11,7 +10,18 @@ class SupabaseService {
 
   static final SupabaseService instance = SupabaseService._internal();
 
-  bool get isConfigured => SupabaseConfig.isConfigured;
+  bool _isConfigured = false;
+  String? initialisationError;
+
+  bool get isConfigured => _isConfigured;
+
+  void setInitialisationResult({
+    required bool isConfigured,
+    String? error,
+  }) {
+    _isConfigured = isConfigured;
+    initialisationError = error;
+  }
 
   SupabaseClient get _client {
     if (!isConfigured) {

@@ -53,7 +53,6 @@ The APK will be written to `build/app/outputs/flutter-apk/app-debug.apk`.
 
 - `lib/models` - road report, connectivity, announcement and account models.
 - `lib/providers` - shared application state.
-- `lib/config` - Supabase build-time configuration.
 - `lib/services` - SQLite and Supabase database operations.
 - `lib/repositories` - local-first report synchronization.
 - `lib/screens/auth` - validated login and registration.
@@ -67,23 +66,15 @@ Authentication is currently a classroom prototype. Road reports use SQLite as th
 
 1. Create a Supabase project.
 2. Open **SQL Editor** and run `supabase/schema.sql` once.
-3. Copy `supabase_config.example.json` to `supabase_config.json`.
-4. In Supabase **Connect** or **API Keys**, copy the Project URL and Publishable Key into `supabase_config.json`.
-5. Run the app with the configuration file:
+3. Open `lib/main.dart` and paste the client-safe **Legacy anon key** into `supabaseKey`.
+4. Run the app normally:
 
 ```powershell
-Copy-Item supabase_config.example.json supabase_config.json
 flutter pub get
-flutter run --dart-define-from-file=supabase_config.json
+flutter run
 ```
 
-For Android Studio, open **Run > Edit Configurations** and add this to **Additional run args**:
-
-```text
---dart-define-from-file=supabase_config.json
-```
-
-If the configuration is omitted, SafeJalan continues to work with SQLite only. The Supabase Publishable Key is intended for client apps; never put a `service_role` or secret key in this Flutter project.
+If `supabaseKey` is empty, SafeJalan continues to work with SQLite only. The Legacy anon key is intended for client apps. Never put an `sb_secret_...` or `service_role` key in this Flutter project because an APK cannot keep it secret.
 
 ## Database synchronization
 
