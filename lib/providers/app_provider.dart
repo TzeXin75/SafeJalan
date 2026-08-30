@@ -105,10 +105,29 @@ class AppProvider extends ChangeNotifier {
     String password, {
     bool admin = false,
   }) async {
-    final user = await _database.findUserByEmail(value);
+    UserAccount? user;
+    if (_supabase.isConfigured && _hadNetwork) {
+      try {
+        await _syncAllUsers();
+        final remoteUser = await _supabase.getUserByEmail(value);
+        if (remoteUser == null ||
+            remoteUser.passwordHash != _hashPassword(password)) {
+          return 'Incorrect email or password';
+        }
+        await _database.upsertRemoteUser(remoteUser);
+        user = await _database.findUserByEmail(value);
+      } catch (_) {
+        // A Wi-Fi/mobile connection can exist without internet. In that case,
+        // use the last synchronized SQLite account.
+        user = await _database.findUserByEmail(value);
+      }
+    } else {
+      user = await _database.findUserByEmail(value);
+    }
     if (user == null || user.passwordHash != _hashPassword(password)) {
       return 'Incorrect email or password';
     }
+    if (!user.isActive) return 'This account has been deactivated';
     if (user.isAdmin != admin) {
       return admin
           ? 'This is not an administrator account'
@@ -125,6 +144,15 @@ class AppProvider extends ChangeNotifier {
   Future<String?> register(String name, String value, String password) async {
     if (await _database.findUserByEmail(value) != null) {
       return 'This email is already registered';
+    }
+    if (_supabase.isConfigured && _hadNetwork) {
+      try {
+        if (await _supabase.getUserByEmail(value) != null) {
+          return 'This email is already registered';
+        }
+      } catch (_) {
+        // Continue offline: SQLite saves the account as pending.
+      }
     }
     try {
       final id = await _database.insertUser(
@@ -186,6 +214,8 @@ class AppProvider extends ChangeNotifier {
       return 'New password cannot be the same as your current password';
     }
     await _database.updatePassword(user.id!, _hashPassword(newPassword));
+    final updated = await _database.findUserById(user.id!);
+    if (updated != null) await _trySyncUser(updated);
     return null;
   }
 
@@ -202,6 +232,8 @@ class AppProvider extends ChangeNotifier {
       return 'New password cannot be the same as your current password';
     }
     await _database.updatePassword(user.id!, _hashPassword(newPassword));
+    final updated = await _database.findUserById(user.id!);
+    if (updated != null) await _trySyncUser(updated);
     return null;
   }
 
@@ -317,11 +349,23 @@ class AppProvider extends ChangeNotifier {
 
   Future<void> _syncAllUsers() async {
     if (!_supabase.isConfigured) return;
-    final users = await _database.getUsers();
+    final users = await _database.getUsers(includeInactive: true);
     for (final user in users) {
       await _trySyncUser(user);
     }
+    try {
+      final profiles = await _supabase.getUserProfiles();
+      for (final profile in profiles) {
+        await _database.upsertRemoteUser(UserAccount.fromRemoteMap(profile));
+      }
+    } catch (error) {
+      lastSyncError = 'User download failed: $error';
+      debugPrint('[SafeJalan sync] $lastSyncError');
+      notifyListeners();
+    }
   }
+
+  Future<void> syncUsers() => _syncAllUsers();
 
   Future<void> _loadVerifications() async {
     _verifiedReportIds
@@ -535,10 +579,18 @@ class AppProvider extends ChangeNotifier {
   }
 
   Future<void> _trySyncUser(UserAccount user, {String? previousEmail}) async {
-    if (!_supabase.isConfigured) return;
+    if (!_supabase.isConfigured || user.syncStatus != 'pending') return;
     try {
-      await _supabase.upsertUserProfile(user, previousEmail: previousEmail);
-    } catch (_) {
+      await _supabase.upsertUserProfile(
+        user,
+        previousEmail: previousEmail ?? user.previousEmail,
+      );
+      if (user.id != null) await _database.markUserSynced(user.id!);
+      lastSyncError = null;
+    } catch (error) {
+      lastSyncError = 'User upload failed (${user.email}): $error';
+      debugPrint('[SafeJalan sync] $lastSyncError');
+      notifyListeners();
       // The local SQLite account remains available if the device is offline.
     }
   }

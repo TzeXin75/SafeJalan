@@ -15,10 +15,7 @@ class SupabaseService {
 
   bool get isConfigured => _isConfigured;
 
-  void setInitialisationResult({
-    required bool isConfigured,
-    String? error,
-  }) {
+  void setInitialisationResult({required bool isConfigured, String? error}) {
     _isConfigured = isConfigured;
     initialisationError = error;
   }
@@ -119,10 +116,23 @@ class SupabaseService {
         .upsert(user.toRemoteMap(), onConflict: 'email');
   }
 
+  Future<UserAccount?> getUserByEmail(String email) async {
+    final row = await _client
+        .from('user_profiles')
+        .select(
+          'email, full_name, password_hash, is_admin, is_active, avatar_url, updated_at',
+        )
+        .eq('email', email.trim().toLowerCase())
+        .maybeSingle();
+    return row == null ? null : UserAccount.fromRemoteMap(row);
+  }
+
   Future<List<Map<String, dynamic>>> getUserProfiles() async {
     final rows = await _client
         .from('user_profiles')
-        .select('email, full_name, is_admin')
+        .select(
+          'email, full_name, password_hash, is_admin, is_active, avatar_url, updated_at',
+        )
         .order('full_name');
     return rows.map((row) => Map<String, dynamic>.from(row)).toList();
   }
@@ -131,6 +141,16 @@ class SupabaseService {
     await _client
         .from('user_profiles')
         .delete()
+        .eq('email', email.toLowerCase());
+  }
+
+  Future<void> deactivateUserProfile(String email) async {
+    await _client
+        .from('user_profiles')
+        .update({
+          'is_active': false,
+          'updated_at': DateTime.now().toUtc().toIso8601String(),
+        })
         .eq('email', email.toLowerCase());
   }
 }

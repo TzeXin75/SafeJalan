@@ -18,7 +18,7 @@ class DatabaseService {
     final directory = await getApplicationDocumentsDirectory();
     return openDatabase(
       '${directory.path}/safejalan.db',
-      version: 6,
+      version: 8,
       onCreate: (db, version) async {
         await _createReportsTable(db);
         await _createUserTables(db);
@@ -53,6 +53,7 @@ class DatabaseService {
           await _createConnectivityReportsTable(db);
           await _createSafetyAnnouncementsTable(db);
         }
+        if (oldVersion < 8) await _migrateUsersForOfflineSync(db);
       },
     );
   }
@@ -226,7 +227,11 @@ class DatabaseService {
         email TEXT NOT NULL UNIQUE COLLATE NOCASE,
         passwordHash TEXT NOT NULL,
         imagePath TEXT,
-        isAdmin INTEGER NOT NULL DEFAULT 0
+        isAdmin INTEGER NOT NULL DEFAULT 0,
+        isActive INTEGER NOT NULL DEFAULT 1,
+        syncStatus TEXT NOT NULL DEFAULT 'pending',
+        updatedAt TEXT NOT NULL,
+        previousEmail TEXT
       )
     ''');
     await db.execute('''
@@ -242,7 +247,80 @@ class DatabaseService {
       'passwordHash':
           '3b612c75a7b5048a435fb6ec81e52ff92d6d795a8b5a9c17070f6a63c97a53b2',
       'isAdmin': 1,
+      'isActive': 1,
+      'syncStatus': 'pending',
+      'updatedAt': DateTime.now().toUtc().toIso8601String(),
     }, conflictAlgorithm: ConflictAlgorithm.ignore);
+  }
+
+  Future<void> _migrateUsersForOfflineSync(Database db) async {
+    final tables = await db.rawQuery(
+      "SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'Users'",
+    );
+    if (tables.isEmpty) {
+      await _createUserTables(db);
+      return;
+    }
+    await db.execute('''
+      CREATE TABLE IF NOT EXISTS AppSettings(
+        settingKey TEXT PRIMARY KEY,
+        settingValue TEXT
+      )
+    ''');
+    final columns = (await db.rawQuery(
+      'PRAGMA table_info(Users)',
+    )).map((row) => row['name'] as String).toSet();
+    if (!columns.contains('passwordHash')) {
+      await db.execute(
+        "ALTER TABLE Users ADD COLUMN passwordHash TEXT NOT NULL DEFAULT ''",
+      );
+    }
+    if (!columns.contains('isActive')) {
+      await db.execute(
+        'ALTER TABLE Users ADD COLUMN isActive INTEGER NOT NULL DEFAULT 1',
+      );
+    }
+    if (!columns.contains('syncStatus')) {
+      await db.execute(
+        "ALTER TABLE Users ADD COLUMN syncStatus TEXT NOT NULL DEFAULT 'pending'",
+      );
+    }
+    if (!columns.contains('updatedAt')) {
+      await db.execute(
+        "ALTER TABLE Users ADD COLUMN updatedAt TEXT NOT NULL DEFAULT ''",
+      );
+    }
+    if (!columns.contains('previousEmail')) {
+      await db.execute('ALTER TABLE Users ADD COLUMN previousEmail TEXT');
+    }
+    final now = DateTime.now().toUtc().toIso8601String();
+    await db.update('Users', {
+      'updatedAt': now,
+      'syncStatus': 'pending',
+    }, where: "updatedAt = ''");
+    await db.insert('Users', {
+      'name': 'SafeJalan Administrator',
+      'email': 'admin@safejalan.my',
+      'passwordHash':
+          '3b612c75a7b5048a435fb6ec81e52ff92d6d795a8b5a9c17070f6a63c97a53b2',
+      'isAdmin': 1,
+      'isActive': 1,
+      'syncStatus': 'pending',
+      'updatedAt': now,
+    }, conflictAlgorithm: ConflictAlgorithm.ignore);
+    await db.update(
+      'Users',
+      {
+        'passwordHash':
+            '3b612c75a7b5048a435fb6ec81e52ff92d6d795a8b5a9c17070f6a63c97a53b2',
+        'isAdmin': 1,
+        'isActive': 1,
+        'syncStatus': 'pending',
+        'updatedAt': now,
+      },
+      where: "email = ? COLLATE NOCASE AND passwordHash = ''",
+      whereArgs: ['admin@safejalan.my'],
+    );
   }
 
   Future<UserAccount?> findUserByEmail(String email) async {
@@ -265,9 +343,10 @@ class DatabaseService {
     return rows.isEmpty ? null : UserAccount.fromMap(rows.first);
   }
 
-  Future<List<UserAccount>> getUsers() async {
+  Future<List<UserAccount>> getUsers({bool includeInactive = false}) async {
     final rows = await (await database).query(
       'Users',
+      where: includeInactive ? null : 'isActive = 1',
       orderBy: 'name COLLATE NOCASE',
     );
     return rows.map(UserAccount.fromMap).toList();
@@ -275,13 +354,41 @@ class DatabaseService {
 
   Future<int> getRegularUserCount() async {
     final result = await (await database).rawQuery(
-      'SELECT COUNT(*) AS total FROM Users WHERE isAdmin = 0',
+      'SELECT COUNT(*) AS total FROM Users WHERE isAdmin = 0 AND isActive = 1',
     );
     return Sqflite.firstIntValue(result) ?? 0;
   }
 
   Future<int> insertUser(UserAccount user) async =>
-      (await database).insert('Users', user.toMap());
+      (await database).insert('Users', user.toMap()..remove('id'));
+
+  Future<void> upsertRemoteUser(UserAccount remoteUser) async {
+    final db = await database;
+    final local = await findUserByEmail(remoteUser.email);
+    if (local != null && local.syncStatus == 'pending') return;
+    final values = remoteUser.toMap()
+      ..remove('id')
+      ..['syncStatus'] = 'synced'
+      ..['previousEmail'] = null;
+    if (local == null) {
+      await db.insert(
+        'Users',
+        values,
+        conflictAlgorithm: ConflictAlgorithm.ignore,
+      );
+    } else {
+      await db.update('Users', values, where: 'id = ?', whereArgs: [local.id]);
+    }
+  }
+
+  Future<void> markUserSynced(int id) async {
+    await (await database).update(
+      'Users',
+      {'syncStatus': 'synced', 'previousEmail': null},
+      where: 'id = ?',
+      whereArgs: [id],
+    );
+  }
 
   Future<void> updateUserProfile(
     int id,
@@ -289,9 +396,20 @@ class DatabaseService {
     String email,
     String? imagePath,
   ) async {
+    final current = await findUserById(id);
+    final normalizedEmail = email.toLowerCase();
     await (await database).update(
       'Users',
-      {'name': name, 'email': email.toLowerCase(), 'imagePath': imagePath},
+      {
+        'name': name,
+        'email': normalizedEmail,
+        'imagePath': imagePath,
+        'syncStatus': 'pending',
+        'updatedAt': DateTime.now().toUtc().toIso8601String(),
+        'previousEmail': normalizedEmail == current?.email.toLowerCase()
+            ? null
+            : current?.email.toLowerCase(),
+      },
       where: 'id = ?',
       whereArgs: [id],
     );
@@ -300,7 +418,11 @@ class DatabaseService {
   Future<void> updatePassword(int id, String passwordHash) async {
     await (await database).update(
       'Users',
-      {'passwordHash': passwordHash},
+      {
+        'passwordHash': passwordHash,
+        'syncStatus': 'pending',
+        'updatedAt': DateTime.now().toUtc().toIso8601String(),
+      },
       where: 'id = ?',
       whereArgs: [id],
     );
@@ -316,7 +438,16 @@ class DatabaseService {
     if (user == null) return;
     await (await database).update(
       'Users',
-      {'name': name, 'email': email.toLowerCase(), 'isAdmin': isAdmin ? 1 : 0},
+      {
+        'name': name,
+        'email': email.toLowerCase(),
+        'isAdmin': isAdmin ? 1 : 0,
+        'syncStatus': 'pending',
+        'updatedAt': DateTime.now().toUtc().toIso8601String(),
+        'previousEmail': user.email.toLowerCase() == email.toLowerCase()
+            ? null
+            : user.email.toLowerCase(),
+      },
       where: 'id = ?',
       whereArgs: [id],
     );
@@ -325,8 +456,17 @@ class DatabaseService {
     }
   }
 
-  Future<void> deleteUser(int id) async {
-    await (await database).delete('Users', where: 'id = ?', whereArgs: [id]);
+  Future<void> deactivateUser(int id) async {
+    await (await database).update(
+      'Users',
+      {
+        'isActive': 0,
+        'syncStatus': 'pending',
+        'updatedAt': DateTime.now().toUtc().toIso8601String(),
+      },
+      where: 'id = ?',
+      whereArgs: [id],
+    );
   }
 
   Future<void> changeReportOwner(String oldEmail, String newEmail) async {

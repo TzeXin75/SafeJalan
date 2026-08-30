@@ -4,7 +4,6 @@ import 'package:provider/provider.dart';
 import '../../models/user_account.dart';
 import '../../providers/app_provider.dart';
 import '../../services/database_service.dart';
-import '../../services/supabase_service.dart';
 
 class ManageUsersScreen extends StatefulWidget {
   const ManageUsersScreen({super.key});
@@ -56,7 +55,9 @@ class _ManageUsersScreenState extends State<ManageUsersScreen> {
       !user.isAdmin,
     );
     final updated = await DatabaseService.instance.findUserById(user.id!);
-    if (updated != null) await _trySyncProfile(updated);
+    if (updated != null && mounted) {
+      await context.read<AppProvider>().syncUsers();
+    }
     if (mounted) setState(_reload);
   }
 
@@ -64,8 +65,10 @@ class _ManageUsersScreenState extends State<ManageUsersScreen> {
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('Delete User'),
-        content: Text('Delete ${user.name} (${user.email})?'),
+        title: const Text('Deactivate User'),
+        content: Text(
+          '${user.name} (${user.email}) will be hidden and unable to log in. The database record is retained.',
+        ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
@@ -74,36 +77,15 @@ class _ManageUsersScreenState extends State<ManageUsersScreen> {
           FilledButton(
             style: FilledButton.styleFrom(backgroundColor: Colors.red),
             onPressed: () => Navigator.pop(context, true),
-            child: const Text('Delete'),
+            child: const Text('Deactivate'),
           ),
         ],
       ),
     );
     if (confirmed != true) return;
-    if (SupabaseService.instance.isConfigured) {
-      try {
-        await SupabaseService.instance.deleteUserProfile(user.email);
-      } catch (_) {
-        // Keep local account management usable while offline.
-      }
-    }
-    await DatabaseService.instance.deleteUser(user.id!);
+    await DatabaseService.instance.deactivateUser(user.id!);
+    if (mounted) await context.read<AppProvider>().syncUsers();
     if (mounted) setState(_reload);
-  }
-
-  Future<void> _trySyncProfile(
-    UserAccount user, {
-    String? previousEmail,
-  }) async {
-    if (!SupabaseService.instance.isConfigured) return;
-    try {
-      await SupabaseService.instance.upsertUserProfile(
-        user,
-        previousEmail: previousEmail,
-      );
-    } catch (_) {
-      // SQLite remains available while the device is offline.
-    }
   }
 
   @override
@@ -174,7 +156,7 @@ class _ManageUsersScreenState extends State<ManageUsersScreen> {
                                       ),
                                     ),
                                     IconButton(
-                                      tooltip: 'Delete user',
+                                      tooltip: 'Deactivate user',
                                       onPressed: () => _deleteUser(user),
                                       icon: const Icon(
                                         Icons.delete_outline_rounded,
