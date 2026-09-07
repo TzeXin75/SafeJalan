@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:safejalan_native/providers/app_provider.dart';
 import 'package:safejalan_native/widgets/common.dart';
+import 'package:safejalan_native/admin/report_detail.dart';
 
 class ManageReportsScreen extends StatelessWidget {
   const ManageReportsScreen({super.key});
@@ -39,7 +40,16 @@ class ManageReportsScreen extends StatelessWidget {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        ReportTile(report: report, onTap: () {}),
+                        ReportTile(
+                          report: report,
+                          onTap: () => Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (_) =>
+                                  AdminReportDetailScreen(report: report),
+                            ),
+                          ),
+                        ),
                         if (isPending)
                           Row(
                             children: [

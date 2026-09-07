@@ -47,7 +47,9 @@ class _LoginScreenState extends State<LoginScreen> {
     Navigator.pushReplacement(
       context,
       MaterialPageRoute(
-        builder: (_) => widget.admin ? const AdminHome() : const UserHome(),
+        builder: (_) => widget.admin
+            ? const AdminHome()
+            : const UserHome(showWelcome: true),
       ),
     );
   }

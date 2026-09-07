@@ -9,6 +9,7 @@ class UserAccount {
   final String syncStatus;
   final String updatedAt;
   final String? previousEmail;
+  final bool hasRemoteCopy;
 
   UserAccount({
     this.id,
@@ -21,6 +22,7 @@ class UserAccount {
     this.syncStatus = 'pending',
     String? updatedAt,
     this.previousEmail,
+    this.hasRemoteCopy = false,
   }) : updatedAt = updatedAt ?? DateTime.now().toUtc().toIso8601String();
 
   factory UserAccount.fromMap(Map<String, Object?> map) => UserAccount(
@@ -35,6 +37,7 @@ class UserAccount {
     updatedAt:
         map['updatedAt'] as String? ?? DateTime.now().toUtc().toIso8601String(),
     previousEmail: map['previousEmail'] as String?,
+    hasRemoteCopy: (map['hasRemoteCopy'] as int? ?? 0) == 1,
   );
 
   factory UserAccount.fromRemoteMap(Map<String, dynamic> map) => UserAccount(
@@ -48,6 +51,7 @@ class UserAccount {
     updatedAt:
         map['updated_at'] as String? ??
         DateTime.now().toUtc().toIso8601String(),
+    hasRemoteCopy: true,
   );
 
   Map<String, Object?> toMap() => {
@@ -61,6 +65,7 @@ class UserAccount {
     'syncStatus': syncStatus,
     'updatedAt': updatedAt,
     'previousEmail': previousEmail,
+    'hasRemoteCopy': hasRemoteCopy ? 1 : 0,
   };
 
   Map<String, Object?> toRemoteMap() => {

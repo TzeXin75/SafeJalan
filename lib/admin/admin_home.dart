@@ -25,89 +25,93 @@ class _AdminHomeState extends State<AdminHome> {
     AdminToolsScreen(),
   ];
   @override
-  Widget build(BuildContext context) => Scaffold(
-    appBar: AppBar(
-      toolbarHeight: 68,
-      titleSpacing: 16,
-      title: const Row(
-        children: [
-          SafeMark(size: 42),
-          SizedBox(width: 11),
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text('SafeJalan Admin'),
-              Text(
-                'Operations centre',
-                style: TextStyle(
-                  color: mutedText,
-                  fontSize: 11,
-                  fontWeight: FontWeight.w500,
+  Widget build(BuildContext context) {
+    final app = context.watch<AppProvider>();
+    if (!app.isLoggedIn || !app.isAdmin) return const EntryScreen();
+    return Scaffold(
+      appBar: AppBar(
+        toolbarHeight: 68,
+        titleSpacing: 16,
+        title: const Row(
+          children: [
+            SafeMark(size: 42),
+            SizedBox(width: 11),
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text('SafeJalan Admin'),
+                Text(
+                  'Operations centre',
+                  style: TextStyle(
+                    color: mutedText,
+                    fontSize: 11,
+                    fontWeight: FontWeight.w500,
+                  ),
                 ),
-              ),
-            ],
-          ),
-        ],
-      ),
-      actions: [
-        IconButton(
-          tooltip: 'Logout',
-          icon: const Icon(Icons.logout),
-          onPressed: () async {
-            await context.read<AppProvider>().logout();
-            if (!context.mounted) return;
-            Navigator.pushAndRemoveUntil(
-              context,
-              MaterialPageRoute(builder: (_) => const EntryScreen()),
-              (_) => false,
-            );
-          },
+              ],
+            ),
+          ],
         ),
-      ],
-    ),
-    body: IndexedStack(index: _index, children: _pages),
-    bottomNavigationBar: DecoratedBox(
-      decoration: const BoxDecoration(
-        boxShadow: [
-          BoxShadow(
-            color: Color(0x1A0C2745),
-            blurRadius: 24,
-            offset: Offset(0, -5),
+        actions: [
+          IconButton(
+            tooltip: 'Sign out',
+            icon: const Icon(Icons.logout),
+            onPressed: () async {
+              await context.read<AppProvider>().logout();
+              if (!context.mounted) return;
+              Navigator.pushAndRemoveUntil(
+                context,
+                MaterialPageRoute(builder: (_) => const EntryScreen()),
+                (_) => false,
+              );
+            },
           ),
         ],
       ),
-      child: NavigationBar(
-        selectedIndex: _index,
-        indicatorColor: safeOrange.withValues(alpha: .18),
-        onDestinationSelected: (i) => setState(() => _index = i),
-        destinations: const [
-          NavigationDestination(
-            icon: Icon(Icons.dashboard_outlined),
-            selectedIcon: Icon(Icons.dashboard),
-            label: 'Home',
-          ),
-          NavigationDestination(
-            icon: Icon(Icons.people_outline),
-            selectedIcon: Icon(Icons.people),
-            label: 'Users',
-          ),
-          NavigationDestination(
-            icon: Icon(Icons.report_outlined),
-            selectedIcon: Icon(Icons.report),
-            label: 'Reports',
-          ),
-          NavigationDestination(
-            icon: Icon(Icons.wifi_off_outlined),
-            selectedIcon: Icon(Icons.wifi_off_rounded),
-            label: 'Network',
-          ),
-          NavigationDestination(
-            icon: Icon(Icons.grid_view_outlined),
-            selectedIcon: Icon(Icons.grid_view_rounded),
-            label: 'More',
-          ),
-        ],
+      body: IndexedStack(index: _index, children: _pages),
+      bottomNavigationBar: DecoratedBox(
+        decoration: const BoxDecoration(
+          boxShadow: [
+            BoxShadow(
+              color: Color(0x1A0C2745),
+              blurRadius: 24,
+              offset: Offset(0, -5),
+            ),
+          ],
+        ),
+        child: NavigationBar(
+          selectedIndex: _index,
+          indicatorColor: safeOrange.withValues(alpha: .18),
+          onDestinationSelected: (i) => setState(() => _index = i),
+          destinations: const [
+            NavigationDestination(
+              icon: Icon(Icons.dashboard_outlined),
+              selectedIcon: Icon(Icons.dashboard),
+              label: 'Home',
+            ),
+            NavigationDestination(
+              icon: Icon(Icons.people_outline),
+              selectedIcon: Icon(Icons.people),
+              label: 'Users',
+            ),
+            NavigationDestination(
+              icon: Icon(Icons.report_outlined),
+              selectedIcon: Icon(Icons.report),
+              label: 'Reports',
+            ),
+            NavigationDestination(
+              icon: Icon(Icons.wifi_off_outlined),
+              selectedIcon: Icon(Icons.wifi_off_rounded),
+              label: 'Network',
+            ),
+            NavigationDestination(
+              icon: Icon(Icons.grid_view_outlined),
+              selectedIcon: Icon(Icons.grid_view_rounded),
+              label: 'More',
+            ),
+          ],
+        ),
       ),
-    ),
-  );
+    );
+  }
 }

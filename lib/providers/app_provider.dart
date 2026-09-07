@@ -34,6 +34,7 @@ class AppProvider extends ChangeNotifier {
   bool _hadNetwork = false;
   final Set<String> _verifiedReportIds = <String>{};
   final Set<String> _updatingVerificationIds = <String>{};
+  final Set<String> _readAnnouncementIds = <String>{};
 
   bool get isRemoteConfigured => _reportsRepository.isRemoteConfigured;
   List<RoadReport> get adminVisibleReports => reports
@@ -41,7 +42,7 @@ class AppProvider extends ChangeNotifier {
       .toList();
   List<RoadReport> get userVisibleReports => reports.where((report) {
     final status = report.status.toLowerCase();
-    return status != 'resolved' && status != 'archived';
+    return status != 'resolved' && status != 'rejected' && status != 'archived';
   }).toList();
   List<RoadReport> get myReports => reports
       .where(
@@ -51,10 +52,21 @@ class AppProvider extends ChangeNotifier {
       .toList();
   List<RoadReport> get myVisibleReports => myReports.where((report) {
     final status = report.status.toLowerCase();
-    return status != 'resolved' && status != 'archived';
+    return status != 'resolved' && status != 'rejected' && status != 'archived';
   }).toList();
+  List<RoadReport> get myProfileReports => myReports
+      .where((report) => report.status.toLowerCase() != 'archived')
+      .toList();
   List<SafetyAnnouncement> get activeAnnouncements =>
       announcements.where((announcement) => announcement.isActive).toList();
+  List<SafetyAnnouncement> get unreadAnnouncements => activeAnnouncements
+      .where(
+        (announcement) => !_readAnnouncementIds.contains(announcement.remoteId),
+      )
+      .toList();
+
+  bool isAnnouncementRead(SafetyAnnouncement announcement) =>
+      _readAnnouncementIds.contains(announcement.remoteId);
 
   bool hasVerified(RoadReport report) =>
       report.remoteId != null && _verifiedReportIds.contains(report.remoteId);
@@ -70,11 +82,20 @@ class AppProvider extends ChangeNotifier {
     orElse: () => report,
   );
 
+  ConnectivityReport latestConnectivityVersionOf(ConnectivityReport report) =>
+      connectivityReports.firstWhere(
+        (item) => item.remoteId == report.remoteId,
+        orElse: () => report,
+      );
+
   Future<void> initialise() async {
     final signedInUser = await _database.getSignedInUser();
-    if (signedInUser != null) {
+    if (signedInUser != null && signedInUser.isActive) {
       _applyUser(signedInUser);
       await _loadVerifications();
+      await _loadAnnouncementReads();
+    } else if (signedInUser != null) {
+      await _database.saveSignedInUser(null);
     }
     reports = await _reportsRepository.getLocalReports();
     connectivityReports = await _database.getConnectivityReports();
@@ -85,7 +106,9 @@ class AppProvider extends ChangeNotifier {
     await syncReports();
     await syncConnectivityReports();
     await syncSafetyAnnouncements();
+    await syncAnnouncementReads();
     await _syncAllUsers();
+    await _refreshCurrentSession();
   }
 
   String _hashPassword(String password) =>
@@ -137,6 +160,11 @@ class AppProvider extends ChangeNotifier {
     await _database.saveSignedInUser(user.id);
     await _loadVerifications();
     await _trySyncUser(user);
+    if (!admin) {
+      await syncSafetyAnnouncements();
+      await _loadAnnouncementReads();
+      await syncAnnouncementReads();
+    }
     notifyListeners();
     return null;
   }
@@ -246,6 +274,7 @@ class AppProvider extends ChangeNotifier {
     isLoggedIn = false;
     isAdmin = false;
     _verifiedReportIds.clear();
+    _readAnnouncementIds.clear();
     notifyListeners();
   }
 
@@ -305,6 +334,45 @@ class AppProvider extends ChangeNotifier {
     await syncReports();
   }
 
+  bool canModifyOwnReport(RoadReport report) =>
+      _isOwnedByCurrentUser(report.reporterEmail) &&
+      report.status.toLowerCase() == 'pending' &&
+      _isWithinFirst24Hours(report.createdOn);
+
+  Future<String?> updateOwnReport(
+    RoadReport report, {
+    required String title,
+    required String category,
+    required String severity,
+    required String description,
+    required String locationName,
+  }) async {
+    if (!canModifyOwnReport(report)) {
+      return 'Only your pending report can be edited within 24 hours.';
+    }
+    await _reportsRepository.updateReport(
+      report.copyWith(
+        title: title,
+        category: category,
+        severity: severity,
+        description: description,
+        locationName: locationName,
+      ),
+    );
+    reports = await _reportsRepository.getLocalReports();
+    notifyListeners();
+    await syncReports();
+    return null;
+  }
+
+  Future<String?> cancelOwnReport(RoadReport report) async {
+    if (!canModifyOwnReport(report)) {
+      return 'Only your pending report can be cancelled within 24 hours.';
+    }
+    await deleteReport(report);
+    return null;
+  }
+
   Future<void> archiveExpiredResolvedReports() async {
     final now = DateTime.now().toUtc();
     final expiredReports = reports.where((report) {
@@ -358,6 +426,15 @@ class AppProvider extends ChangeNotifier {
     final users = await _database.getUsers(includeInactive: true);
     for (final user in users) {
       await _trySyncUser(user);
+      if (user.hasRemoteCopy &&
+          user.imagePath?.isNotEmpty == true &&
+          !user.imagePath!.startsWith('http')) {
+        try {
+          await _supabase.syncUserAvatar(user);
+        } catch (error) {
+          debugPrint('[SafeJalan sync] Avatar upload failed: $error');
+        }
+      }
     }
     try {
       final profiles = await _supabase.getUserProfiles();
@@ -373,12 +450,85 @@ class AppProvider extends ChangeNotifier {
     }
   }
 
-  Future<void> syncUsers() => _syncAllUsers();
+  Future<void> _refreshCurrentSession() async {
+    if (currentUserId == null) return;
+    final refreshed = await _database.findUserById(currentUserId!);
+    if (refreshed == null || !refreshed.isActive) {
+      await _database.saveSignedInUser(null);
+      currentUserId = null;
+      userName = 'New User';
+      email = '';
+      profileImagePath = null;
+      isAdmin = false;
+      isLoggedIn = false;
+      _verifiedReportIds.clear();
+      _readAnnouncementIds.clear();
+      notifyListeners();
+      return;
+    }
+    _applyUser(refreshed);
+    notifyListeners();
+  }
+
+  Future<void> syncUsers() async {
+    await _syncAllUsers();
+    await _refreshCurrentSession();
+  }
 
   Future<void> _loadVerifications() async {
     _verifiedReportIds
       ..clear()
       ..addAll(await _database.getVerifiedReportIds(email));
+  }
+
+  Future<void> _loadAnnouncementReads() async {
+    _readAnnouncementIds
+      ..clear()
+      ..addAll(await _database.getReadAnnouncementIds(email));
+  }
+
+  Future<void> markAnnouncementRead(SafetyAnnouncement announcement) async {
+    if (email.isEmpty || isAnnouncementRead(announcement)) return;
+    await _database.markAnnouncementRead(announcement.remoteId, email);
+    _readAnnouncementIds.add(announcement.remoteId);
+    notifyListeners();
+    await syncAnnouncementReads();
+  }
+
+  Future<void> markAllNonEmergencyAnnouncementsRead() async {
+    for (final announcement in unreadAnnouncements.where(
+      (item) => item.priority.toLowerCase() != 'emergency',
+    )) {
+      await _database.markAnnouncementRead(announcement.remoteId, email);
+      _readAnnouncementIds.add(announcement.remoteId);
+    }
+    notifyListeners();
+    await syncAnnouncementReads();
+  }
+
+  Future<void> syncAnnouncementReads() async {
+    if (email.isEmpty) return;
+    if (_supabase.isConfigured) {
+      try {
+        final pending = await _database.getPendingAnnouncementReads();
+        for (final row in pending) {
+          final announcementId = row['announcementRemoteId'] as String;
+          final userEmail = row['userEmail'] as String;
+          await _supabase.upsertAnnouncementRead(
+            announcementId: announcementId,
+            userEmail: userEmail,
+            readAt: row['readAt'] as String,
+          );
+          await _database.markAnnouncementReadSynced(announcementId, userEmail);
+        }
+        final remoteRows = await _supabase.getAnnouncementReads(email);
+        await _database.mergeRemoteAnnouncementReads(remoteRows);
+      } catch (error) {
+        debugPrint('[SafeJalan sync] Announcement reads failed: $error');
+      }
+    }
+    await _loadAnnouncementReads();
+    notifyListeners();
   }
 
   Future<void> _syncPendingVerifications() async {
@@ -426,7 +576,9 @@ class AppProvider extends ChangeNotifier {
     await syncReports();
     await syncConnectivityReports();
     await syncSafetyAnnouncements();
+    await syncAnnouncementReads();
     await _syncAllUsers();
+    await _refreshCurrentSession();
   }
 
   Future<void> addConnectivityReport({
@@ -477,6 +629,55 @@ class AppProvider extends ChangeNotifier {
     connectivityReports = await _database.getConnectivityReports();
     notifyListeners();
     await syncConnectivityReports();
+  }
+
+  bool canModifyOwnConnectivityReport(ConnectivityReport report) =>
+      _isOwnedByCurrentUser(report.reporterEmail) &&
+      report.status.toLowerCase() == 'pending' &&
+      _isWithinFirst24Hours(report.createdAt);
+
+  Future<String?> updateOwnConnectivityReport(
+    ConnectivityReport report, {
+    required String issueType,
+    required String carrier,
+    required String notes,
+    required String area,
+  }) async {
+    if (!canModifyOwnConnectivityReport(report)) {
+      return 'Only your pending connectivity report can be edited within 24 hours.';
+    }
+    await _database.updateConnectivityReport(
+      report.copyWith(
+        issueType: issueType,
+        carrier: carrier,
+        notes: notes,
+        area: area,
+        updatedAt: DateTime.now().toUtc().toIso8601String(),
+        syncStatus: 'pending',
+      ),
+    );
+    connectivityReports = await _database.getConnectivityReports();
+    notifyListeners();
+    await syncConnectivityReports();
+    return null;
+  }
+
+  Future<String?> cancelOwnConnectivityReport(ConnectivityReport report) async {
+    if (!canModifyOwnConnectivityReport(report)) {
+      return 'Only your pending connectivity report can be cancelled within 24 hours.';
+    }
+    await deleteConnectivityReport(report);
+    return null;
+  }
+
+  bool _isOwnedByCurrentUser(String ownerEmail) =>
+      email.isNotEmpty && ownerEmail.toLowerCase() == email.toLowerCase();
+
+  bool _isWithinFirst24Hours(String createdAt) {
+    final created = DateTime.tryParse(createdAt)?.toUtc();
+    if (created == null) return false;
+    final elapsed = DateTime.now().toUtc().difference(created);
+    return !elapsed.isNegative && elapsed <= const Duration(hours: 24);
   }
 
   Future<void> syncConnectivityReports() async {
@@ -591,6 +792,20 @@ class AppProvider extends ChangeNotifier {
   Future<void> _trySyncUser(UserAccount user, {String? previousEmail}) async {
     if (!_supabase.isConfigured || user.syncStatus != 'pending') return;
     try {
+      if (!user.hasRemoteCopy) {
+        final existingRemote = await _supabase.getUserByEmail(user.email);
+        final conflictsWithAnotherAccount =
+            existingRemote != null &&
+            (existingRemote.passwordHash != user.passwordHash ||
+                existingRemote.isAdmin != user.isAdmin);
+        if (conflictsWithAnotherAccount) {
+          lastSyncError =
+              'Account sync conflict (${user.email}): this email already exists online.';
+          debugPrint('[SafeJalan sync] $lastSyncError');
+          notifyListeners();
+          return;
+        }
+      }
       await _supabase.upsertUserProfile(
         user,
         previousEmail: previousEmail ?? user.previousEmail,

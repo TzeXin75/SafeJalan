@@ -86,6 +86,10 @@ class ConnectivityReport {
 
   ConnectivityReport copyWith({
     int? id,
+    String? issueType,
+    String? carrier,
+    String? notes,
+    String? area,
     String? status,
     String? updatedAt,
     String? syncStatus,
@@ -93,10 +97,10 @@ class ConnectivityReport {
   }) => ConnectivityReport(
     id: id ?? this.id,
     remoteId: remoteId,
-    issueType: issueType,
-    carrier: carrier,
-    notes: notes,
-    area: area,
+    issueType: issueType ?? this.issueType,
+    carrier: carrier ?? this.carrier,
+    notes: notes ?? this.notes,
+    area: area ?? this.area,
     reporterEmail: reporterEmail,
     status: status ?? this.status,
     createdAt: createdAt,

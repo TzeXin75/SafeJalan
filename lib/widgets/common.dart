@@ -1,6 +1,6 @@
-import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:safejalan_native/models/report.dart';
+import 'package:safejalan_native/widgets/stored_image.dart';
 
 const navy = Color(0xFF101828);
 const primary = Color(0xFF3B5BDB);
@@ -21,6 +21,7 @@ Color statusColor(String value) => switch (value.toLowerCase()) {
   'pending' => safeOrange,
   'reviewed' => primary,
   'resolved' => const Color(0xFF16A34A),
+  'rejected' => const Color(0xFFDC2626),
   _ => mutedText,
 };
 
@@ -62,20 +63,19 @@ class ReportTile extends StatelessWidget {
               child: SizedBox(
                 width: 76,
                 height: 76,
-                child:
-                    report.imagePath != null &&
-                        File(report.imagePath!).existsSync()
-                    ? Image.file(File(report.imagePath!), fit: BoxFit.cover)
-                    : ColoredBox(
-                        color: severityColor(
-                          report.severity,
-                        ).withValues(alpha: .12),
-                        child: Icon(
-                          Icons.add_road,
-                          color: severityColor(report.severity),
-                          size: 32,
-                        ),
-                      ),
+                child: StoredImage(
+                  path: report.imagePath,
+                  fallback: ColoredBox(
+                    color: severityColor(
+                      report.severity,
+                    ).withValues(alpha: .12),
+                    child: Icon(
+                      Icons.add_road,
+                      color: severityColor(report.severity),
+                      size: 32,
+                    ),
+                  ),
+                ),
               ),
             ),
             const SizedBox(width: 14),
@@ -176,11 +176,20 @@ class SafeMark extends StatelessWidget {
   const SafeMark({super.key, this.size = 42});
 
   @override
-  Widget build(BuildContext context) => SizedBox.square(
-    dimension: size,
+  Widget build(BuildContext context) => Container(
+    width: size,
+    height: size,
+    padding: EdgeInsets.all(size * .12),
+    decoration: BoxDecoration(
+      color: Colors.white,
+      shape: BoxShape.circle,
+      border: Border.all(color: const Color(0xFFE5EAF2)),
+      boxShadow: const [BoxShadow(color: Color(0x26000000), blurRadius: 8)],
+    ),
     child: Image.asset(
       'assets/images/safejalan_app_icon.png',
       fit: BoxFit.contain,
+      filterQuality: FilterQuality.high,
       semanticLabel: 'SafeJalan symbol',
     ),
   );

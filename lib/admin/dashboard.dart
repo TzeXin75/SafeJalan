@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 import 'package:safejalan_native/providers/app_provider.dart';
 import 'package:safejalan_native/services/database_service.dart';
 import 'package:safejalan_native/widgets/common.dart';
+import 'package:safejalan_native/admin/report_detail.dart';
 
 class DashboardScreen extends StatelessWidget {
   const DashboardScreen({super.key});
@@ -10,6 +11,9 @@ class DashboardScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     final reports = context.watch<AppProvider>().adminVisibleReports;
     final resolved = reports.where((r) => r.status == 'Resolved').length;
+    final pending = reports
+        .where((r) => r.status.toLowerCase() == 'pending')
+        .length;
     return SafeArea(
       child: ListView(
         padding: const EdgeInsets.all(16),
@@ -40,12 +44,7 @@ class DashboardScreen extends StatelessWidget {
                 Colors.orange,
               ),
               _Kpi(Icons.check_circle, '$resolved', 'Resolved', Colors.green),
-              _Kpi(
-                Icons.pending_actions,
-                '${reports.length - resolved}',
-                'Pending',
-                Colors.red,
-              ),
+              _Kpi(Icons.pending_actions, '$pending', 'Pending', Colors.red),
             ],
           ),
           const SizedBox(height: 20),
@@ -85,7 +84,19 @@ class DashboardScreen extends StatelessWidget {
           const SizedBox(height: 16),
           const PageTitle('Recent Reports', 'Latest community submissions'),
           const SizedBox(height: 8),
-          ...reports.take(3).map((r) => ReportTile(report: r, onTap: () {})),
+          ...reports
+              .take(3)
+              .map(
+                (r) => ReportTile(
+                  report: r,
+                  onTap: () => Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => AdminReportDetailScreen(report: r),
+                    ),
+                  ),
+                ),
+              ),
         ],
       ),
     );

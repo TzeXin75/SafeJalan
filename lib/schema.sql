@@ -317,3 +317,43 @@ grant select, insert, update, delete on public.connectivity_reports
   to service_role;
 grant select, insert, update, delete on public.safety_announcements
   to service_role;
+
+-- Per-user announcement read receipts. Emergency announcements are marked
+-- read by the Flutter app only after the user opens the detail page.
+create table if not exists public.announcement_reads (
+  announcement_id uuid not null references public.safety_announcements(id)
+    on delete cascade,
+  user_email text not null,
+  read_at timestamptz not null default now(),
+  primary key (announcement_id, user_email)
+);
+
+alter table public.announcement_reads enable row level security;
+
+drop policy if exists "prototype_read_announcement_reads"
+  on public.announcement_reads;
+create policy "prototype_read_announcement_reads"
+  on public.announcement_reads for select
+  to anon, authenticated using (true);
+
+drop policy if exists "prototype_write_announcement_reads"
+  on public.announcement_reads;
+create policy "prototype_write_announcement_reads"
+  on public.announcement_reads for insert
+  to anon, authenticated with check (true);
+
+drop policy if exists "prototype_update_announcement_reads"
+  on public.announcement_reads;
+create policy "prototype_update_announcement_reads"
+  on public.announcement_reads for update
+  to anon, authenticated using (true) with check (true);
+
+grant select, insert, update on public.announcement_reads
+  to anon, authenticated, service_role;
+
+-- Public image bucket for report evidence and profile avatars. The Flutter
+-- service also creates it automatically when the classroom service key has
+-- permission, so this statement is safe to run more than once.
+insert into storage.buckets (id, name, public)
+values ('safejalan-images', 'safejalan-images', true)
+on conflict (id) do update set public = excluded.public;

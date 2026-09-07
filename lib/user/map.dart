@@ -16,7 +16,7 @@ class MapScreen extends StatelessWidget {
     final reports = context.watch<AppProvider>().userVisibleReports;
     final announcementCount = context
         .watch<AppProvider>()
-        .activeAnnouncements
+        .unreadAnnouncements
         .length;
     return SafeArea(
       child: Column(

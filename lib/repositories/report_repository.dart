@@ -92,9 +92,22 @@ class ReportRepository {
       }
 
       final remoteReports = await _remote.getReports();
+      final localReports = await _local.getReports();
       final remoteIds = <String>{};
       for (final report in remoteReports) {
         remoteIds.add(report.remoteId!);
+        if (report.imagePath == null) {
+          final matchingLocal = localReports.where(
+            (local) => local.remoteId == report.remoteId,
+          );
+          if (matchingLocal.isNotEmpty) {
+            final local = matchingLocal.first;
+            if (local.imagePath?.isNotEmpty == true &&
+                !local.imagePath!.startsWith('http')) {
+              await _remote.syncReportImage(local);
+            }
+          }
+        }
         await _local.upsertRemoteReport(report);
       }
       await _local.deleteSyncedReportsMissingFromRemote(remoteIds);

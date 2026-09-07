@@ -45,13 +45,14 @@ class DatabaseService {
     final directory = await getApplicationDocumentsDirectory();
     return openDatabase(
       '${directory.path}/safejalan.db',
-      version: 9,
+      version: 11,
       onCreate: (db, version) async {
         await _createReportsTable(db);
         await _createUserTables(db);
         await _createVerificationTable(db);
         await _createConnectivityReportsTable(db);
         await _createSafetyAnnouncementsTable(db);
+        await _createAnnouncementReadsTable(db);
       },
       onUpgrade: (db, oldVersion, newVersion) async {
         if (oldVersion < 2) {
@@ -82,6 +83,8 @@ class DatabaseService {
         }
         if (oldVersion < 8) await _migrateUsersForOfflineSync(db);
         if (oldVersion < 9) await _replaceDefaultAdmins(db);
+        if (oldVersion < 10) await _migrateUserRemoteTracking(db);
+        if (oldVersion < 11) await _createAnnouncementReadsTable(db);
       },
     );
   }
@@ -133,6 +136,73 @@ class DatabaseService {
         isDeleted INTEGER NOT NULL DEFAULT 0
       )
     ''');
+  }
+
+  Future<void> _createAnnouncementReadsTable(Database db) async {
+    await db.execute('''
+      CREATE TABLE IF NOT EXISTS AnnouncementReads(
+        announcementRemoteId TEXT NOT NULL,
+        userEmail TEXT NOT NULL COLLATE NOCASE,
+        readAt TEXT NOT NULL,
+        syncStatus TEXT NOT NULL DEFAULT 'pending',
+        PRIMARY KEY(announcementRemoteId, userEmail)
+      )
+    ''');
+  }
+
+  Future<Set<String>> getReadAnnouncementIds(String userEmail) async {
+    if (userEmail.isEmpty) return <String>{};
+    final rows = await (await database).query(
+      'AnnouncementReads',
+      columns: ['announcementRemoteId'],
+      where: 'userEmail = ? COLLATE NOCASE',
+      whereArgs: [userEmail],
+    );
+    return rows.map((row) => row['announcementRemoteId'] as String).toSet();
+  }
+
+  Future<void> markAnnouncementRead(
+    String announcementRemoteId,
+    String userEmail,
+  ) async {
+    await (await database).insert('AnnouncementReads', {
+      'announcementRemoteId': announcementRemoteId,
+      'userEmail': userEmail.toLowerCase(),
+      'readAt': DateTime.now().toUtc().toIso8601String(),
+      'syncStatus': 'pending',
+    }, conflictAlgorithm: ConflictAlgorithm.replace);
+  }
+
+  Future<List<Map<String, Object?>>> getPendingAnnouncementReads() async =>
+      (await database).query(
+        'AnnouncementReads',
+        where: "syncStatus = 'pending'",
+      );
+
+  Future<void> markAnnouncementReadSynced(
+    String announcementRemoteId,
+    String userEmail,
+  ) async {
+    await (await database).update(
+      'AnnouncementReads',
+      {'syncStatus': 'synced'},
+      where: 'announcementRemoteId = ? AND userEmail = ? COLLATE NOCASE',
+      whereArgs: [announcementRemoteId, userEmail],
+    );
+  }
+
+  Future<void> mergeRemoteAnnouncementReads(
+    List<Map<String, dynamic>> remoteRows,
+  ) async {
+    final db = await database;
+    for (final row in remoteRows) {
+      await db.insert('AnnouncementReads', {
+        'announcementRemoteId': row['announcement_id'],
+        'userEmail': (row['user_email'] as String).toLowerCase(),
+        'readAt': row['read_at'] as String,
+        'syncStatus': 'synced',
+      }, conflictAlgorithm: ConflictAlgorithm.ignore);
+    }
   }
 
   Future<Set<String>> getVerifiedReportIds(String userEmail) async {
@@ -259,7 +329,8 @@ class DatabaseService {
         isActive INTEGER NOT NULL DEFAULT 1,
         syncStatus TEXT NOT NULL DEFAULT 'pending',
         updatedAt TEXT NOT NULL,
-        previousEmail TEXT
+        previousEmail TEXT,
+        hasRemoteCopy INTEGER NOT NULL DEFAULT 0
       )
     ''');
     await db.execute('''
@@ -326,6 +397,24 @@ class DatabaseService {
       whereArgs: [_legacyAdminEmail],
     );
     await _seedDefaultAdmins(db);
+  }
+
+  Future<void> _migrateUserRemoteTracking(Database db) async {
+    final columns = (await db.rawQuery(
+      'PRAGMA table_info(Users)',
+    )).map((row) => row['name'] as String).toSet();
+    if (!columns.contains('hasRemoteCopy')) {
+      await db.execute(
+        'ALTER TABLE Users ADD COLUMN hasRemoteCopy INTEGER NOT NULL DEFAULT 0',
+      );
+      // Synced rows are known remote accounts. Pending rows must be checked
+      // against Supabase before the first upsert, which protects an offline
+      // registration from overwriting an account that already owns the email.
+      await db.rawUpdate('''
+        UPDATE Users
+        SET hasRemoteCopy = CASE WHEN syncStatus = 'synced' THEN 1 ELSE 0 END
+      ''');
+    }
   }
 
   Future<void> _seedDefaultAdmins(Database db) async {
@@ -403,7 +492,13 @@ class DatabaseService {
     final values = remoteUser.toMap()
       ..remove('id')
       ..['syncStatus'] = 'synced'
-      ..['previousEmail'] = null;
+      ..['previousEmail'] = null
+      ..['hasRemoteCopy'] = 1;
+    if (local?.imagePath != null &&
+        local!.imagePath!.isNotEmpty &&
+        !local.imagePath!.startsWith('http')) {
+      values['imagePath'] = local.imagePath;
+    }
     if (local == null) {
       await db.insert(
         'Users',
@@ -418,7 +513,7 @@ class DatabaseService {
   Future<void> markUserSynced(int id) async {
     await (await database).update(
       'Users',
-      {'syncStatus': 'synced', 'previousEmail': null},
+      {'syncStatus': 'synced', 'previousEmail': null, 'hasRemoteCopy': 1},
       where: 'id = ?',
       whereArgs: [id],
     );
@@ -625,7 +720,11 @@ class DatabaseService {
     final existing = RoadReport.fromLocalMap(existingRows.first);
     final merged = report.copyWith(
       id: existing.id,
-      imagePath: report.imagePath ?? existing.imagePath,
+      imagePath:
+          existing.imagePath?.isNotEmpty == true &&
+              !existing.imagePath!.startsWith('http')
+          ? existing.imagePath
+          : report.imagePath ?? existing.imagePath,
       syncStatus: 'synced',
     );
     await updateReport(merged);

@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 
 import 'package:safejalan_native/providers/app_provider.dart';
 import 'package:safejalan_native/widgets/common.dart';
+import 'package:safejalan_native/user/connectivity_detail.dart';
 
 class ConnectivityScreen extends StatefulWidget {
   const ConnectivityScreen({super.key});
@@ -49,8 +50,7 @@ class _ConnectivityScreenState extends State<ConnectivityScreen> {
     final items = app.connectivityReports
         .where(
           (report) =>
-              report.reporterEmail.toLowerCase() == app.email.toLowerCase() &&
-              report.status.toLowerCase() != 'resolved',
+              report.reporterEmail.toLowerCase() == app.email.toLowerCase(),
         )
         .toList();
     return SafeArea(
@@ -151,6 +151,13 @@ class _ConnectivityScreenState extends State<ConnectivityScreen> {
                     (item) => Card(
                       margin: const EdgeInsets.only(bottom: 10),
                       child: ListTile(
+                        onTap: () => Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (_) =>
+                                ConnectivityDetailScreen(report: item),
+                          ),
+                        ),
                         leading: const CircleAvatar(
                           child: Icon(Icons.wifi_off),
                         ),
@@ -159,9 +166,14 @@ class _ConnectivityScreenState extends State<ConnectivityScreen> {
                           '${item.carrier} · ${item.issueType}\n${item.notes}',
                         ),
                         isThreeLine: true,
-                        trailing: LabelBadge(
-                          item.status,
-                          statusColor(item.status),
+                        trailing: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          crossAxisAlignment: CrossAxisAlignment.end,
+                          children: [
+                            LabelBadge(item.status, statusColor(item.status)),
+                            const SizedBox(height: 4),
+                            const Icon(Icons.chevron_right, size: 18),
+                          ],
                         ),
                       ),
                     ),

@@ -35,3 +35,4 @@ flutter:
   assets:
     - assets/images/safejalan_logo.png
     - assets/images/safejalan_app_icon.png
+    - assets/data/kkr_myjalan_statistics.json

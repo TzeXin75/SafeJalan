@@ -1,5 +1,3 @@
-import 'dart:io';
-
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:safejalan_native/providers/app_provider.dart';
@@ -7,6 +5,7 @@ import 'package:safejalan_native/widgets/common.dart';
 import 'package:safejalan_native/entry.dart';
 import 'package:safejalan_native/user/report_detail.dart';
 import 'package:safejalan_native/user/edit_profile.dart';
+import 'package:safejalan_native/widgets/stored_image.dart';
 
 class ProfileScreen extends StatelessWidget {
   const ProfileScreen({super.key});
@@ -75,14 +74,8 @@ class ProfileScreen extends StatelessWidget {
                   child: CircleAvatar(
                     radius: 45,
                     backgroundColor: const Color(0xFFE7ECFF),
-                    backgroundImage:
-                        app.profileImagePath != null &&
-                            File(app.profileImagePath!).existsSync()
-                        ? FileImage(File(app.profileImagePath!))
-                        : null,
-                    child:
-                        app.profileImagePath == null ||
-                            !File(app.profileImagePath!).existsSync()
+                    backgroundImage: storedImageProvider(app.profileImagePath),
+                    child: storedImageProvider(app.profileImagePath) == null
                         ? const Icon(Icons.person, color: primary, size: 52)
                         : null,
                   ),
@@ -230,19 +223,17 @@ class ProfileScreen extends StatelessWidget {
           const SizedBox(height: 18),
           const PageTitle('Report History', 'Your latest submissions'),
           const SizedBox(height: 8),
-          ...app.myVisibleReports
-              .take(3)
-              .map(
-                (r) => ReportTile(
-                  report: r,
-                  onTap: () => Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (_) => ReportDetailScreen(report: r),
-                    ),
-                  ),
+          ...app.myProfileReports.map(
+            (r) => ReportTile(
+              report: r,
+              onTap: () => Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => ReportDetailScreen(report: r),
                 ),
               ),
+            ),
+          ),
           const SizedBox(height: 6),
           OutlinedButton.icon(
             style: OutlinedButton.styleFrom(foregroundColor: Colors.red),
@@ -256,7 +247,7 @@ class ProfileScreen extends StatelessWidget {
               );
             },
             icon: const Icon(Icons.logout),
-            label: const Text('Logout'),
+            label: const Text('Sign out'),
           ),
         ],
       ),

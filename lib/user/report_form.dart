@@ -41,12 +41,16 @@ class _ReportFormScreenState extends State<ReportFormScreen> {
   int _locationRun = 0;
   final Location _location = Location();
 
-  static final _emojiPattern = RegExp(
-    r'[\u{1F1E6}-\u{1F1FF}\u{1F300}-\u{1FAFF}\u{2600}-\u{27BF}\u{FE0F}]',
-    unicode: true,
-  );
   static final _letterOrNumberPattern = RegExp(
     r'[A-Za-z0-9\u00C0-\u024F\u4E00-\u9FFF]',
+  );
+
+  static bool _containsEmoji(String text) => text.runes.any(
+    (codePoint) =>
+        (codePoint >= 0x1F1E6 && codePoint <= 0x1F1FF) ||
+        (codePoint >= 0x1F300 && codePoint <= 0x1FAFF) ||
+        (codePoint >= 0x2600 && codePoint <= 0x27BF) ||
+        codePoint == 0xFE0F,
   );
 
   @override
@@ -459,7 +463,7 @@ class _ReportFormScreenState extends State<ReportFormScreen> {
     if (text.length < minimum) {
       return '$fieldName must contain at least $minimum characters';
     }
-    if (_emojiPattern.hasMatch(text)) {
+    if (_containsEmoji(text)) {
       return '$fieldName cannot contain emoji';
     }
     if (!_letterOrNumberPattern.hasMatch(text)) {
