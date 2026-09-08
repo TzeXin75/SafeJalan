@@ -45,48 +45,39 @@ The APK will be written to `build/app/outputs/flutter-apk/app-debug.apk`.
 - Practical 4: `Navigator`, `MaterialPageRoute`, and passing report objects.
 - Practical 5: Provider, `ChangeNotifier` and `notifyListeners`.
 - Practical 6: `Form`, validators, dropdowns and choice chips.
-- Practical 7: SharedPreferences for profile and login state.
+- Practical 9: SQLite for accounts, login state and offline application data.
 - Practical 8: image_picker, path_provider and `Image.file`.
-- Practical 9: SQLite CRUD for persistent road reports.
+- Practical 9: SQLite CRUD for road reports, connectivity reports and safety announcements.
 - Practical 11: Supabase remote CRUD and synchronization.
 - Practical 12: flutter_map and OpenStreetMap markers.
 - Practical 13: location permissions and device GPS.
 
 ## Structure
 
-- `lib/models` - report model.
+- `lib/models` - road report, connectivity, announcement and account models.
 - `lib/providers` - shared application state.
-- `lib/config` - Supabase build-time configuration.
 - `lib/services` - SQLite and Supabase database operations.
 - `lib/repositories` - local-first report synchronization.
 - `lib/screens/auth` - validated login and registration.
-- `lib/screens/user` - map, reporting, connectivity, leaderboard and profile.
-- `lib/screens/admin` - dashboard, management, heatmap and statistics.
+- `lib/screens/user` - map, reporting, announcements, connectivity, leaderboard and profile.
+- `lib/screens/admin` - dashboard, user/report/connectivity/announcement management, heatmap and statistics.
 - `lib/widgets` - reusable Flutter widgets.
 
-Authentication is currently a classroom prototype. Road reports use SQLite as the offline local database and Supabase as the optional remote database.
+Authentication follows the classroom offline-first approach; it does not use Supabase Auth. SQLite is used without internet, while `user_profiles` mirrors the same accounts to Supabase whenever internet is available.
 
 ## Configure Supabase remote database
 
 1. Create a Supabase project.
 2. Open **SQL Editor** and run `supabase/schema.sql` once.
-3. Copy `supabase_config.example.json` to `supabase_config.json`.
-4. In Supabase **Connect** or **API Keys**, copy the Project URL and Publishable Key into `supabase_config.json`.
-5. Run the app with the configuration file:
+3. Open `lib/main.dart` and paste the client-safe **Legacy anon key** into `supabaseKey`.
+4. Run the app normally:
 
 ```powershell
-Copy-Item supabase_config.example.json supabase_config.json
 flutter pub get
-flutter run --dart-define-from-file=supabase_config.json
+flutter run
 ```
 
-For Android Studio, open **Run > Edit Configurations** and add this to **Additional run args**:
-
-```text
---dart-define-from-file=supabase_config.json
-```
-
-If the configuration is omitted, SafeJalan continues to work with SQLite only. The Supabase Publishable Key is intended for client apps; never put a `service_role` or secret key in this Flutter project.
+If `supabaseKey` is empty, SafeJalan continues to work with SQLite only. Use a client-safe Legacy anon/publishable key. Never put an `sb_secret_...` or `service_role` key in this Flutter project because an APK cannot keep it secret.
 
 ## Database synchronization
 
@@ -94,8 +85,13 @@ If the configuration is omitted, SafeJalan continues to work with SQLite only. T
 - Unsynced records are marked `pending`.
 - When Supabase is configured, pending records upload automatically.
 - On startup and after CRUD operations, remote rows are downloaded into SQLite.
+- Verification rows are downloaded so a user's Still Exists state is restored on another device.
+- Connectivity reports and safety announcements follow the same local-first sync flow.
+- Registration, profile edits, password changes, role changes and deactivation use the same pending/synced flow.
+- With internet, login checks Supabase and refreshes SQLite. Without internet, login checks SQLite.
+- When connectivity returns, pending SQLite user data is uploaded and the latest Supabase profiles are downloaded.
 - Failed remote requests stay safely in SQLite and retry on the next sync.
-- Profile shows whether the app is using SQLite only or SQLite + Supabase, and includes a manual Sync button.
+- Synchronization runs automatically; the Profile page does not require a manual Sync button.
 
 ## Fresh data and leaderboard
 
@@ -103,4 +99,4 @@ If the configuration is omitted, SafeJalan continues to work with SQLite only. T
 - Version 2 performs a one-time reset of older local SQLite reports and SharedPreferences data.
 - A user joins the leaderboard automatically after submitting the first report.
 - Points are calculated automatically: 80 points per report plus 5 points per verification vote.
-- The current local prototype has one user account. A multi-user leaderboard requires a shared backend such as Supabase.
+- The leaderboard combines synchronized Supabase profiles with locally available reports.

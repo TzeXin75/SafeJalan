@@ -1,12 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
-import '../../providers/app_provider.dart';
-import '../../widgets/common.dart';
-import '../admin/admin_home.dart';
-import '../user/user_home.dart';
-import 'forgot_password.dart';
-import 'register.dart';
+import 'package:safejalan_native/providers/app_provider.dart';
+import 'package:safejalan_native/widgets/common.dart';
+import 'package:safejalan_native/admin/admin_home.dart';
+import 'package:safejalan_native/user/user_home.dart';
+import 'package:safejalan_native/auth/forgot_password.dart';
+import 'package:safejalan_native/auth/register.dart';
 
 class LoginScreen extends StatefulWidget {
   final bool admin;
@@ -47,7 +47,9 @@ class _LoginScreenState extends State<LoginScreen> {
     Navigator.pushReplacement(
       context,
       MaterialPageRoute(
-        builder: (_) => widget.admin ? const AdminHome() : const UserHome(),
+        builder: (_) => widget.admin
+            ? const AdminHome()
+            : const UserHome(showWelcome: true),
       ),
     );
   }
@@ -188,17 +190,20 @@ class _LoginScreenState extends State<LoginScreen> {
                         ),
                         TextButton(
                           onPressed: () async {
-                            final success = await Navigator.push<bool>(
-                              context,
-                              MaterialPageRoute(
-                                builder: (_) => const RegisterScreen(),
-                              ),
-                            );
-                            if (success == true && mounted) {
+                            final result =
+                                await Navigator.push<RegistrationResult>(
+                                  context,
+                                  MaterialPageRoute(
+                                    builder: (_) => const RegisterScreen(),
+                                  ),
+                                );
+                            if (result != null && mounted) {
                               setState(() {
+                                _email.text = result.email;
+                                _password.text = result.password;
                                 _loginError = null;
                                 _successMessage =
-                                    'Registration successful. Please log in.';
+                                    'Registration successful. Your login details are ready.';
                               });
                             }
                           },

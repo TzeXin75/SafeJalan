@@ -5,18 +5,24 @@ import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:crypto/crypto.dart';
 import 'package:flutter/material.dart';
 import 'package:sqflite/sqflite.dart';
-import '../models/leaderboard_entry.dart';
-import '../models/user_account.dart';
-import '../models/report.dart';
-import '../repositories/report_repository.dart';
-import '../services/database_service.dart';
-import '../services/supabase_service.dart';
+import 'package:uuid/uuid.dart';
+import 'package:safejalan_native/models/connectivity_report.dart';
+import 'package:safejalan_native/models/leaderboard_entry.dart';
+import 'package:safejalan_native/models/user_account.dart';
+import 'package:safejalan_native/models/report.dart';
+import 'package:safejalan_native/models/safety_announcement.dart';
+import 'package:safejalan_native/repositories/report_repository.dart';
+import 'package:safejalan_native/services/database_service.dart';
+import 'package:safejalan_native/services/supabase_service.dart';
 
 class AppProvider extends ChangeNotifier {
   final DatabaseService _database = DatabaseService.instance;
   final ReportRepository _reportsRepository = ReportRepository();
   final SupabaseService _supabase = SupabaseService.instance;
+  static const _uuid = Uuid();
   List<RoadReport> reports = [];
+  List<ConnectivityReport> connectivityReports = [];
+  List<SafetyAnnouncement> announcements = [];
   String userName = 'New User';
   String email = '';
   String? profileImagePath;
@@ -28,6 +34,7 @@ class AppProvider extends ChangeNotifier {
   bool _hadNetwork = false;
   final Set<String> _verifiedReportIds = <String>{};
   final Set<String> _updatingVerificationIds = <String>{};
+  final Set<String> _readAnnouncementIds = <String>{};
 
   bool get isRemoteConfigured => _reportsRepository.isRemoteConfigured;
   List<RoadReport> get adminVisibleReports => reports
@@ -35,7 +42,7 @@ class AppProvider extends ChangeNotifier {
       .toList();
   List<RoadReport> get userVisibleReports => reports.where((report) {
     final status = report.status.toLowerCase();
-    return status != 'resolved' && status != 'archived';
+    return status != 'resolved' && status != 'rejected' && status != 'archived';
   }).toList();
   List<RoadReport> get myReports => reports
       .where(
@@ -45,8 +52,21 @@ class AppProvider extends ChangeNotifier {
       .toList();
   List<RoadReport> get myVisibleReports => myReports.where((report) {
     final status = report.status.toLowerCase();
-    return status != 'resolved' && status != 'archived';
+    return status != 'resolved' && status != 'rejected' && status != 'archived';
   }).toList();
+  List<RoadReport> get myProfileReports => myReports
+      .where((report) => report.status.toLowerCase() != 'archived')
+      .toList();
+  List<SafetyAnnouncement> get activeAnnouncements =>
+      announcements.where((announcement) => announcement.isActive).toList();
+  List<SafetyAnnouncement> get unreadAnnouncements => activeAnnouncements
+      .where(
+        (announcement) => !_readAnnouncementIds.contains(announcement.remoteId),
+      )
+      .toList();
+
+  bool isAnnouncementRead(SafetyAnnouncement announcement) =>
+      _readAnnouncementIds.contains(announcement.remoteId);
 
   bool hasVerified(RoadReport report) =>
       report.remoteId != null && _verifiedReportIds.contains(report.remoteId);
@@ -62,18 +82,33 @@ class AppProvider extends ChangeNotifier {
     orElse: () => report,
   );
 
+  ConnectivityReport latestConnectivityVersionOf(ConnectivityReport report) =>
+      connectivityReports.firstWhere(
+        (item) => item.remoteId == report.remoteId,
+        orElse: () => report,
+      );
+
   Future<void> initialise() async {
     final signedInUser = await _database.getSignedInUser();
-    if (signedInUser != null) {
+    if (signedInUser != null && signedInUser.isActive) {
       _applyUser(signedInUser);
       await _loadVerifications();
+      await _loadAnnouncementReads();
+    } else if (signedInUser != null) {
+      await _database.saveSignedInUser(null);
     }
     reports = await _reportsRepository.getLocalReports();
+    connectivityReports = await _database.getConnectivityReports();
+    announcements = await _database.getSafetyAnnouncements();
     await _startConnectivityListener();
     isLoading = false;
     notifyListeners();
     await syncReports();
+    await syncConnectivityReports();
+    await syncSafetyAnnouncements();
+    await syncAnnouncementReads();
     await _syncAllUsers();
+    await _refreshCurrentSession();
   }
 
   String _hashPassword(String password) =>
@@ -93,10 +128,29 @@ class AppProvider extends ChangeNotifier {
     String password, {
     bool admin = false,
   }) async {
-    final user = await _database.findUserByEmail(value);
+    UserAccount? user;
+    if (_supabase.isConfigured && _hadNetwork) {
+      try {
+        await _syncAllUsers();
+        final remoteUser = await _supabase.getUserByEmail(value);
+        if (remoteUser == null ||
+            remoteUser.passwordHash != _hashPassword(password)) {
+          return 'Incorrect email or password';
+        }
+        await _database.upsertRemoteUser(remoteUser);
+        user = await _database.findUserByEmail(value);
+      } catch (_) {
+        // A Wi-Fi/mobile connection can exist without internet. In that case,
+        // use the last synchronized SQLite account.
+        user = await _database.findUserByEmail(value);
+      }
+    } else {
+      user = await _database.findUserByEmail(value);
+    }
     if (user == null || user.passwordHash != _hashPassword(password)) {
       return 'Incorrect email or password';
     }
+    if (!user.isActive) return 'This account has been deactivated';
     if (user.isAdmin != admin) {
       return admin
           ? 'This is not an administrator account'
@@ -106,6 +160,11 @@ class AppProvider extends ChangeNotifier {
     await _database.saveSignedInUser(user.id);
     await _loadVerifications();
     await _trySyncUser(user);
+    if (!admin) {
+      await syncSafetyAnnouncements();
+      await _loadAnnouncementReads();
+      await syncAnnouncementReads();
+    }
     notifyListeners();
     return null;
   }
@@ -113,6 +172,15 @@ class AppProvider extends ChangeNotifier {
   Future<String?> register(String name, String value, String password) async {
     if (await _database.findUserByEmail(value) != null) {
       return 'This email is already registered';
+    }
+    if (_supabase.isConfigured && _hadNetwork) {
+      try {
+        if (await _supabase.getUserByEmail(value) != null) {
+          return 'This email is already registered';
+        }
+      } catch (_) {
+        // Continue offline: SQLite saves the account as pending.
+      }
     }
     try {
       final id = await _database.insertUser(
@@ -174,6 +242,8 @@ class AppProvider extends ChangeNotifier {
       return 'New password cannot be the same as your current password';
     }
     await _database.updatePassword(user.id!, _hashPassword(newPassword));
+    final updated = await _database.findUserById(user.id!);
+    if (updated != null) await _trySyncUser(updated);
     return null;
   }
 
@@ -190,6 +260,8 @@ class AppProvider extends ChangeNotifier {
       return 'New password cannot be the same as your current password';
     }
     await _database.updatePassword(user.id!, _hashPassword(newPassword));
+    final updated = await _database.findUserById(user.id!);
+    if (updated != null) await _trySyncUser(updated);
     return null;
   }
 
@@ -202,6 +274,7 @@ class AppProvider extends ChangeNotifier {
     isLoggedIn = false;
     isAdmin = false;
     _verifiedReportIds.clear();
+    _readAnnouncementIds.clear();
     notifyListeners();
   }
 
@@ -261,6 +334,45 @@ class AppProvider extends ChangeNotifier {
     await syncReports();
   }
 
+  bool canModifyOwnReport(RoadReport report) =>
+      _isOwnedByCurrentUser(report.reporterEmail) &&
+      report.status.toLowerCase() == 'pending' &&
+      _isWithinFirst24Hours(report.createdOn);
+
+  Future<String?> updateOwnReport(
+    RoadReport report, {
+    required String title,
+    required String category,
+    required String severity,
+    required String description,
+    required String locationName,
+  }) async {
+    if (!canModifyOwnReport(report)) {
+      return 'Only your pending report can be edited within 24 hours.';
+    }
+    await _reportsRepository.updateReport(
+      report.copyWith(
+        title: title,
+        category: category,
+        severity: severity,
+        description: description,
+        locationName: locationName,
+      ),
+    );
+    reports = await _reportsRepository.getLocalReports();
+    notifyListeners();
+    await syncReports();
+    return null;
+  }
+
+  Future<String?> cancelOwnReport(RoadReport report) async {
+    if (!canModifyOwnReport(report)) {
+      return 'Only your pending report can be cancelled within 24 hours.';
+    }
+    await deleteReport(report);
+    return null;
+  }
+
   Future<void> archiveExpiredResolvedReports() async {
     final now = DateTime.now().toUtc();
     final expiredReports = reports.where((report) {
@@ -305,16 +417,118 @@ class AppProvider extends ChangeNotifier {
 
   Future<void> _syncAllUsers() async {
     if (!_supabase.isConfigured) return;
-    final users = await _database.getUsers();
+    const legacyAdminEmail = 'admin@safejalan.my';
+    try {
+      await _supabase.deleteUserProfile(legacyAdminEmail);
+    } catch (error) {
+      debugPrint('[SafeJalan sync] Legacy admin removal failed: $error');
+    }
+    final users = await _database.getUsers(includeInactive: true);
     for (final user in users) {
       await _trySyncUser(user);
+      if (user.hasRemoteCopy &&
+          user.imagePath?.isNotEmpty == true &&
+          !user.imagePath!.startsWith('http')) {
+        try {
+          await _supabase.syncUserAvatar(user);
+        } catch (error) {
+          debugPrint('[SafeJalan sync] Avatar upload failed: $error');
+        }
+      }
     }
+    try {
+      final profiles = await _supabase.getUserProfiles();
+      for (final profile in profiles) {
+        final remoteEmail = (profile['email'] as String? ?? '').toLowerCase();
+        if (remoteEmail == legacyAdminEmail) continue;
+        await _database.upsertRemoteUser(UserAccount.fromRemoteMap(profile));
+      }
+    } catch (error) {
+      lastSyncError = 'User download failed: $error';
+      debugPrint('[SafeJalan sync] $lastSyncError');
+      notifyListeners();
+    }
+  }
+
+  Future<void> _refreshCurrentSession() async {
+    if (currentUserId == null) return;
+    final refreshed = await _database.findUserById(currentUserId!);
+    if (refreshed == null || !refreshed.isActive) {
+      await _database.saveSignedInUser(null);
+      currentUserId = null;
+      userName = 'New User';
+      email = '';
+      profileImagePath = null;
+      isAdmin = false;
+      isLoggedIn = false;
+      _verifiedReportIds.clear();
+      _readAnnouncementIds.clear();
+      notifyListeners();
+      return;
+    }
+    _applyUser(refreshed);
+    notifyListeners();
+  }
+
+  Future<void> syncUsers() async {
+    await _syncAllUsers();
+    await _refreshCurrentSession();
   }
 
   Future<void> _loadVerifications() async {
     _verifiedReportIds
       ..clear()
       ..addAll(await _database.getVerifiedReportIds(email));
+  }
+
+  Future<void> _loadAnnouncementReads() async {
+    _readAnnouncementIds
+      ..clear()
+      ..addAll(await _database.getReadAnnouncementIds(email));
+  }
+
+  Future<void> markAnnouncementRead(SafetyAnnouncement announcement) async {
+    if (email.isEmpty || isAnnouncementRead(announcement)) return;
+    await _database.markAnnouncementRead(announcement.remoteId, email);
+    _readAnnouncementIds.add(announcement.remoteId);
+    notifyListeners();
+    await syncAnnouncementReads();
+  }
+
+  Future<void> markAllNonEmergencyAnnouncementsRead() async {
+    for (final announcement in unreadAnnouncements.where(
+      (item) => item.priority.toLowerCase() != 'emergency',
+    )) {
+      await _database.markAnnouncementRead(announcement.remoteId, email);
+      _readAnnouncementIds.add(announcement.remoteId);
+    }
+    notifyListeners();
+    await syncAnnouncementReads();
+  }
+
+  Future<void> syncAnnouncementReads() async {
+    if (email.isEmpty) return;
+    if (_supabase.isConfigured) {
+      try {
+        final pending = await _database.getPendingAnnouncementReads();
+        for (final row in pending) {
+          final announcementId = row['announcementRemoteId'] as String;
+          final userEmail = row['userEmail'] as String;
+          await _supabase.upsertAnnouncementRead(
+            announcementId: announcementId,
+            userEmail: userEmail,
+            readAt: row['readAt'] as String,
+          );
+          await _database.markAnnouncementReadSynced(announcementId, userEmail);
+        }
+        final remoteRows = await _supabase.getAnnouncementReads(email);
+        await _database.mergeRemoteAnnouncementReads(remoteRows);
+      } catch (error) {
+        debugPrint('[SafeJalan sync] Announcement reads failed: $error');
+      }
+    }
+    await _loadAnnouncementReads();
+    notifyListeners();
   }
 
   Future<void> _syncPendingVerifications() async {
@@ -335,6 +549,13 @@ class AppProvider extends ChangeNotifier {
         // Leave this row pending so the next reconnect can retry it.
       }
     }
+    try {
+      final remoteRows = await _supabase.getVerifications();
+      await _database.mergeRemoteVerifications(remoteRows);
+      if (email.isNotEmpty) await _loadVerifications();
+    } catch (_) {
+      // Keep local verification state if the remote table is unavailable.
+    }
   }
 
   Future<void> _startConnectivityListener() async {
@@ -353,14 +574,248 @@ class AppProvider extends ChangeNotifier {
 
   Future<void> _retryPendingData() async {
     await syncReports();
+    await syncConnectivityReports();
+    await syncSafetyAnnouncements();
+    await syncAnnouncementReads();
     await _syncAllUsers();
+    await _refreshCurrentSession();
+  }
+
+  Future<void> addConnectivityReport({
+    required String issueType,
+    required String carrier,
+    required String notes,
+    required String area,
+  }) async {
+    final now = DateTime.now().toUtc().toIso8601String();
+    await _database.insertConnectivityReport(
+      ConnectivityReport(
+        remoteId: _uuid.v4(),
+        issueType: issueType,
+        carrier: carrier,
+        notes: notes,
+        area: area,
+        reporterEmail: email,
+        createdAt: now,
+        updatedAt: now,
+      ),
+    );
+    connectivityReports = await _database.getConnectivityReports();
+    notifyListeners();
+    await syncConnectivityReports();
+  }
+
+  Future<bool> updateConnectivityStatus(
+    ConnectivityReport report,
+    String status,
+  ) async {
+    await _database.updateConnectivityReport(
+      report.copyWith(
+        status: status,
+        updatedAt: DateTime.now().toUtc().toIso8601String(),
+        syncStatus: 'pending',
+      ),
+    );
+    connectivityReports = await _database.getConnectivityReports();
+    notifyListeners();
+    await syncConnectivityReports();
+    final updated = connectivityReports.where((item) => item.id == report.id);
+    return updated.isNotEmpty && updated.first.syncStatus == 'synced';
+  }
+
+  Future<void> deleteConnectivityReport(ConnectivityReport report) async {
+    if (report.id == null) return;
+    await _database.markConnectivityReportDeleted(report);
+    connectivityReports = await _database.getConnectivityReports();
+    notifyListeners();
+    await syncConnectivityReports();
+  }
+
+  bool canModifyOwnConnectivityReport(ConnectivityReport report) =>
+      _isOwnedByCurrentUser(report.reporterEmail) &&
+      report.status.toLowerCase() == 'pending' &&
+      _isWithinFirst24Hours(report.createdAt);
+
+  Future<String?> updateOwnConnectivityReport(
+    ConnectivityReport report, {
+    required String issueType,
+    required String carrier,
+    required String notes,
+    required String area,
+  }) async {
+    if (!canModifyOwnConnectivityReport(report)) {
+      return 'Only your pending connectivity report can be edited within 24 hours.';
+    }
+    await _database.updateConnectivityReport(
+      report.copyWith(
+        issueType: issueType,
+        carrier: carrier,
+        notes: notes,
+        area: area,
+        updatedAt: DateTime.now().toUtc().toIso8601String(),
+        syncStatus: 'pending',
+      ),
+    );
+    connectivityReports = await _database.getConnectivityReports();
+    notifyListeners();
+    await syncConnectivityReports();
+    return null;
+  }
+
+  Future<String?> cancelOwnConnectivityReport(ConnectivityReport report) async {
+    if (!canModifyOwnConnectivityReport(report)) {
+      return 'Only your pending connectivity report can be cancelled within 24 hours.';
+    }
+    await deleteConnectivityReport(report);
+    return null;
+  }
+
+  bool _isOwnedByCurrentUser(String ownerEmail) =>
+      email.isNotEmpty && ownerEmail.toLowerCase() == email.toLowerCase();
+
+  bool _isWithinFirst24Hours(String createdAt) {
+    final created = DateTime.tryParse(createdAt)?.toUtc();
+    if (created == null) return false;
+    final elapsed = DateTime.now().toUtc().difference(created);
+    return !elapsed.isNegative && elapsed <= const Duration(hours: 24);
+  }
+
+  Future<void> syncConnectivityReports() async {
+    if (!_supabase.isConfigured) return;
+    try {
+      final pending = await _database.getPendingConnectivityReports();
+      for (final report in pending) {
+        if (report.id == null) continue;
+        if (report.isDeleted) {
+          await _supabase.deleteConnectivityReport(report.remoteId);
+          await _database.deleteConnectivityReport(report.id!);
+        } else {
+          await _supabase.upsertConnectivityReport(report);
+          await _database.markConnectivityReportSynced(report.id!);
+        }
+      }
+      final remoteReports = await _supabase.getConnectivityReports();
+      final remoteIds = <String>{};
+      for (final report in remoteReports) {
+        remoteIds.add(report.remoteId);
+        await _database.upsertRemoteConnectivityReport(report);
+      }
+      await _database.deleteSyncedConnectivityMissingFromRemote(remoteIds);
+      connectivityReports = await _database.getConnectivityReports();
+      notifyListeners();
+    } catch (_) {
+      // SQLite remains available; pending changes retry after reconnect.
+    }
+  }
+
+  Future<void> addSafetyAnnouncement({
+    required String title,
+    required String message,
+    required String priority,
+    required bool isActive,
+  }) async {
+    final now = DateTime.now().toUtc().toIso8601String();
+    await _database.insertSafetyAnnouncement(
+      SafetyAnnouncement(
+        remoteId: _uuid.v4(),
+        title: title,
+        message: message,
+        priority: priority,
+        isActive: isActive,
+        createdAt: now,
+        updatedAt: now,
+      ),
+    );
+    announcements = await _database.getSafetyAnnouncements();
+    notifyListeners();
+    await syncSafetyAnnouncements();
+  }
+
+  Future<void> updateSafetyAnnouncement(
+    SafetyAnnouncement announcement, {
+    required String title,
+    required String message,
+    required String priority,
+    required bool isActive,
+  }) async {
+    await _database.updateSafetyAnnouncement(
+      announcement.copyWith(
+        title: title,
+        message: message,
+        priority: priority,
+        isActive: isActive,
+        updatedAt: DateTime.now().toUtc().toIso8601String(),
+        syncStatus: 'pending',
+      ),
+    );
+    announcements = await _database.getSafetyAnnouncements();
+    notifyListeners();
+    await syncSafetyAnnouncements();
+  }
+
+  Future<void> deleteSafetyAnnouncement(SafetyAnnouncement announcement) async {
+    if (announcement.id == null) return;
+    await _database.markSafetyAnnouncementDeleted(announcement);
+    announcements = await _database.getSafetyAnnouncements();
+    notifyListeners();
+    await syncSafetyAnnouncements();
+  }
+
+  Future<void> syncSafetyAnnouncements() async {
+    if (!_supabase.isConfigured) return;
+    try {
+      final pending = await _database.getPendingSafetyAnnouncements();
+      for (final announcement in pending) {
+        if (announcement.id == null) continue;
+        if (announcement.isDeleted) {
+          await _supabase.deleteSafetyAnnouncement(announcement.remoteId);
+          await _database.deleteSafetyAnnouncement(announcement.id!);
+        } else {
+          await _supabase.upsertSafetyAnnouncement(announcement);
+          await _database.markSafetyAnnouncementSynced(announcement.id!);
+        }
+      }
+      final remoteAnnouncements = await _supabase.getSafetyAnnouncements();
+      final remoteIds = <String>{};
+      for (final announcement in remoteAnnouncements) {
+        remoteIds.add(announcement.remoteId);
+        await _database.upsertRemoteSafetyAnnouncement(announcement);
+      }
+      await _database.deleteSyncedAnnouncementsMissingFromRemote(remoteIds);
+      announcements = await _database.getSafetyAnnouncements();
+      notifyListeners();
+    } catch (_) {
+      // SQLite remains available; pending changes retry after reconnect.
+    }
   }
 
   Future<void> _trySyncUser(UserAccount user, {String? previousEmail}) async {
-    if (!_supabase.isConfigured) return;
+    if (!_supabase.isConfigured || user.syncStatus != 'pending') return;
     try {
-      await _supabase.upsertUserProfile(user, previousEmail: previousEmail);
-    } catch (_) {
+      if (!user.hasRemoteCopy) {
+        final existingRemote = await _supabase.getUserByEmail(user.email);
+        final conflictsWithAnotherAccount =
+            existingRemote != null &&
+            (existingRemote.passwordHash != user.passwordHash ||
+                existingRemote.isAdmin != user.isAdmin);
+        if (conflictsWithAnotherAccount) {
+          lastSyncError =
+              'Account sync conflict (${user.email}): this email already exists online.';
+          debugPrint('[SafeJalan sync] $lastSyncError');
+          notifyListeners();
+          return;
+        }
+      }
+      await _supabase.upsertUserProfile(
+        user,
+        previousEmail: previousEmail ?? user.previousEmail,
+      );
+      if (user.id != null) await _database.markUserSynced(user.id!);
+      lastSyncError = null;
+    } catch (error) {
+      lastSyncError = 'User upload failed (${user.email}): $error';
+      debugPrint('[SafeJalan sync] $lastSyncError');
+      notifyListeners();
       // The local SQLite account remains available if the device is offline.
     }
   }

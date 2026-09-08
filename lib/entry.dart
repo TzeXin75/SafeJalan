@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 
-import '../widgets/common.dart';
-import 'auth/login.dart';
+import 'package:safejalan_native/widgets/common.dart';
+import 'package:safejalan_native/auth/login.dart';
 
 class EntryScreen extends StatelessWidget {
   const EntryScreen({super.key});
@@ -34,31 +34,41 @@ class EntryScreen extends StatelessWidget {
                 padding: const EdgeInsets.fromLTRB(24, 72, 24, 28),
                 child: Column(
                   children: [
-                    const SafeLogo(size: 164, dark: true),
-                    const SizedBox(height: 22),
+                    const HeroBrandMark(size: 146),
+                    const SizedBox(height: 24),
                     Container(
                       padding: const EdgeInsets.symmetric(
                         horizontal: 12,
                         vertical: 7,
                       ),
                       decoration: BoxDecoration(
-                        color: safeOrange.withValues(alpha: .12),
+                        color: safeTeal.withValues(alpha: .12),
                         borderRadius: BorderRadius.circular(999),
                         border: Border.all(
-                          color: safeOrange.withValues(alpha: .32),
+                          color: safeTeal.withValues(alpha: .25),
                         ),
                       ),
                       child: const Text(
                         'SMARTER ROADS · SAFER COMMUNITIES',
                         style: TextStyle(
-                          color: Color(0xFFFFBF69),
+                          color: Color(0xFF6EE7C4),
                           fontSize: 10,
                           fontWeight: FontWeight.w800,
                           letterSpacing: 1.1,
                         ),
                       ),
                     ),
-                    const SizedBox(height: 18),
+                    const SizedBox(height: 16),
+                    const Text(
+                      'SafeJalan',
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontSize: 44,
+                        fontWeight: FontWeight.w900,
+                        letterSpacing: -1.4,
+                      ),
+                    ),
+                    const SizedBox(height: 10),
                     const SizedBox(
                       width: 330,
                       child: Text(
@@ -108,8 +118,7 @@ class EntryScreen extends StatelessWidget {
                             width: double.infinity,
                             child: FilledButton.icon(
                               style: FilledButton.styleFrom(
-                                backgroundColor: safeOrange,
-                                foregroundColor: navy,
+                                backgroundColor: primary,
                                 minimumSize: const Size.fromHeight(56),
                               ),
                               onPressed: () => Navigator.push(
@@ -135,14 +144,10 @@ class EntryScreen extends StatelessWidget {
               child: TextButton.icon(
                 style: TextButton.styleFrom(
                   foregroundColor: Colors.white,
-                  backgroundColor: Colors.white.withValues(alpha: .1),
+                  backgroundColor: Colors.white.withValues(alpha: .08),
                   padding: const EdgeInsets.symmetric(
-                    horizontal: 15,
-                    vertical: 11,
-                  ),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(14),
-                    side: const BorderSide(color: Colors.white24),
+                    horizontal: 14,
+                    vertical: 10,
                   ),
                 ),
                 icon: const Icon(Icons.admin_panel_settings_outlined, size: 18),

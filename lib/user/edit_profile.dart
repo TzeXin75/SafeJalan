@@ -5,8 +5,9 @@ import 'package:image_picker/image_picker.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:provider/provider.dart';
 
-import '../../providers/app_provider.dart';
-import '../../widgets/common.dart';
+import 'package:safejalan_native/providers/app_provider.dart';
+import 'package:safejalan_native/widgets/common.dart';
+import 'package:safejalan_native/widgets/stored_image.dart';
 
 class EditProfileScreen extends StatefulWidget {
   const EditProfileScreen({super.key});
@@ -95,9 +96,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
   @override
   Widget build(BuildContext context) {
     final oldPath = context.watch<AppProvider>().profileImagePath;
-    final oldImage = oldPath != null && File(oldPath).existsSync()
-        ? File(oldPath)
-        : null;
+    final oldImage = storedImageProvider(oldPath);
     return Scaffold(
       appBar: AppBar(title: const Text('Edit Profile')),
       body: Form(
@@ -114,9 +113,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                   backgroundColor: const Color(0xFFDDE4FF),
                   backgroundImage: _newImage != null
                       ? FileImage(_newImage!)
-                      : oldImage == null
-                      ? null
-                      : FileImage(oldImage),
+                      : oldImage,
                   child: _newImage == null && oldImage == null
                       ? const Icon(Icons.add_a_photo, color: primary, size: 42)
                       : null,

@@ -1,19 +1,57 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import 'config/supabase_config.dart';
-import 'providers/app_provider.dart';
-import 'screens/entry.dart';
-import 'widgets/common.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:safejalan_native/providers/app_provider.dart';
+import 'package:safejalan_native/entry.dart';
+import 'package:safejalan_native/services/supabase_service.dart';
+import 'package:safejalan_native/widgets/common.dart';
+import 'package:safejalan_native/admin/admin_home.dart';
+import 'package:safejalan_native/user/user_home.dart';
 
-Future<void> main() async {
+const String supabaseUrl = 'https://ubcunymjqlxqznyuvmey.supabase.co';
+
+// Classroom prototype: follows the lecture example by passing the Supabase
+// secret key through anonKey. Do not reuse this setup for a production app.
+const String supabaseKey = '';
+
+void main() {
   WidgetsFlutterBinding.ensureInitialized();
-  await SupabaseConfig.initialise();
+  final appProvider = AppProvider();
   runApp(
-    ChangeNotifierProvider(
-      create: (_) => AppProvider()..initialise(),
+    ChangeNotifierProvider.value(
+      value: appProvider,
       child: const SafeJalanApp(),
     ),
   );
+  unawaited(_bootstrap(appProvider));
+}
+
+Future<void> _bootstrap(AppProvider appProvider) async {
+  final localInitialisation = appProvider.initialise();
+  if (supabaseUrl.trim().isNotEmpty && supabaseKey.trim().isNotEmpty) {
+    try {
+      await Supabase.initialize(
+        url: supabaseUrl,
+        // ignore: deprecated_member_use
+        anonKey: supabaseKey,
+      ).timeout(const Duration(seconds: 8));
+      SupabaseService.instance.setInitialisationResult(isConfigured: true);
+    } catch (error) {
+      SupabaseService.instance.setInitialisationResult(
+        isConfigured: false,
+        error: error.toString(),
+      );
+    }
+  }
+  await localInitialisation;
+  if (SupabaseService.instance.isConfigured) {
+    await appProvider.syncReports();
+    await appProvider.syncConnectivityReports();
+    await appProvider.syncSafetyAnnouncements();
+    await appProvider.syncAnnouncementReads();
+    await appProvider.syncUsers();
+  }
 }
 
 class SafeJalanApp extends StatelessWidget {
@@ -117,6 +155,32 @@ class SafeJalanApp extends StatelessWidget {
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
       ),
     ),
-    home: const EntryScreen(),
+    home: const _SessionGate(),
   );
+}
+
+class _SessionGate extends StatelessWidget {
+  const _SessionGate();
+
+  @override
+  Widget build(BuildContext context) {
+    final app = context.watch<AppProvider>();
+    if (app.isLoading) {
+      return const Scaffold(
+        backgroundColor: navy,
+        body: Center(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              HeroBrandMark(size: 112),
+              SizedBox(height: 20),
+              CircularProgressIndicator(color: Colors.white),
+            ],
+          ),
+        ),
+      );
+    }
+    if (!app.isLoggedIn) return const EntryScreen();
+    return app.isAdmin ? const AdminHome() : const UserHome();
+  }
 }

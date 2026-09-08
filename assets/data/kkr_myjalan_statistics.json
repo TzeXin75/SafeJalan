@@ -1,0 +1,30 @@
+{
+  "datasetTitle": "MYJalan Complaint Statistics",
+  "sourceOrganisation": "Ministry of Works Malaysia (KKR)",
+  "sourceUrl": "https://www.kkr.gov.my/ms/statistik-aduan-myjalan",
+  "periodStart": "1 August 2023",
+  "dataAsOf": "31 July 2026",
+  "pageLastUpdated": "24 August 2026",
+  "totalComplaints": 68334,
+  "kkrComplaints": 21448,
+  "otherAgencyComplaints": 46886,
+  "kkrResolved": 20762,
+  "kkrInProgress": 686,
+  "kkrResolutionRate": 96.8,
+  "julyComplaints": 2245,
+  "julyKkrComplaints": 838,
+  "julyOtherAgencyComplaints": 1407,
+  "previousMonthComplaints": 2510,
+  "categoryBreakdown": [
+    {"name": "Jalan Berlubang", "englishName": "Potholes", "count": 7191},
+    {"name": "Jalan Rosak", "englishName": "Road Damage", "count": 3903},
+    {"name": "Lampu Jalan", "englishName": "Street Lights", "count": 3524},
+    {"name": "Lampu Isyarat", "englishName": "Traffic Lights", "count": 3152},
+    {"name": "Garisan Jalan", "englishName": "Road Markings", "count": 1165},
+    {"name": "Halangan", "englishName": "Obstructions", "count": 1074},
+    {"name": "Kemudahan Awam", "englishName": "Public Facilities", "count": 477},
+    {"name": "Papan Tanda", "englishName": "Road Signs", "count": 446},
+    {"name": "Perabot Jalan", "englishName": "Road Furniture", "count": 370},
+    {"name": "Tanah Runtuh", "englishName": "Landslides", "count": 146}
+  ]
+}
