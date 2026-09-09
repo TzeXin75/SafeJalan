@@ -140,8 +140,6 @@ class AppProvider extends ChangeNotifier {
         await _database.upsertRemoteUser(remoteUser);
         user = await _database.findUserByEmail(value);
       } catch (_) {
-        // A Wi-Fi/mobile connection can exist without internet. In that case,
-        // use the last synchronized SQLite account.
         user = await _database.findUserByEmail(value);
       }
     } else {
@@ -178,9 +176,7 @@ class AppProvider extends ChangeNotifier {
         if (await _supabase.getUserByEmail(value) != null) {
           return 'This email is already registered';
         }
-      } catch (_) {
-        // Continue offline: SQLite saves the account as pending.
-      }
+      } catch (_) {}
     }
     try {
       final id = await _database.insertUser(
@@ -545,17 +541,13 @@ class AppProvider extends ChangeNotifier {
           await _supabase.upsertVerification(reportId, userEmail);
         }
         await _database.markVerificationSynced(reportId, userEmail, isDeleted);
-      } catch (_) {
-        // Leave this row pending so the next reconnect can retry it.
-      }
+      } catch (_) {}
     }
     try {
       final remoteRows = await _supabase.getVerifications();
       await _database.mergeRemoteVerifications(remoteRows);
       if (email.isNotEmpty) await _loadVerifications();
-    } catch (_) {
-      // Keep local verification state if the remote table is unavailable.
-    }
+    } catch (_) {}
   }
 
   Future<void> _startConnectivityListener() async {
@@ -703,9 +695,7 @@ class AppProvider extends ChangeNotifier {
       await _database.deleteSyncedConnectivityMissingFromRemote(remoteIds);
       connectivityReports = await _database.getConnectivityReports();
       notifyListeners();
-    } catch (_) {
-      // SQLite remains available; pending changes retry after reconnect.
-    }
+    } catch (_) {}
   }
 
   Future<void> addSafetyAnnouncement({
@@ -784,9 +774,7 @@ class AppProvider extends ChangeNotifier {
       await _database.deleteSyncedAnnouncementsMissingFromRemote(remoteIds);
       announcements = await _database.getSafetyAnnouncements();
       notifyListeners();
-    } catch (_) {
-      // SQLite remains available; pending changes retry after reconnect.
-    }
+    } catch (_) {}
   }
 
   Future<void> _trySyncUser(UserAccount user, {String? previousEmail}) async {
@@ -816,7 +804,6 @@ class AppProvider extends ChangeNotifier {
       lastSyncError = 'User upload failed (${user.email}): $error';
       debugPrint('[SafeJalan sync] $lastSyncError');
       notifyListeners();
-      // The local SQLite account remains available if the device is offline.
     }
   }
 
@@ -835,9 +822,7 @@ class AppProvider extends ChangeNotifier {
           names[email] = (profile['full_name'] as String? ?? '').trim();
           if (profile['is_admin'] as bool? ?? false) adminEmails.add(email);
         }
-      } catch (_) {
-        // Continue with SQLite users and locally available reports offline.
-      }
+      } catch (_) {}
     }
 
     final localUsers = await _database.getUsers();

@@ -19,8 +19,6 @@ subprojects {
     project.evaluationDependsOn(":app")
 }
 
-// Some third-party Flutter plugins still compile their Android bridge with
-// Java 8. The code remains compatible; suppress only this JDK options warning.
 subprojects {
     tasks.withType<JavaCompile>().configureEach {
         options.compilerArgs.add("-Xlint:-options")

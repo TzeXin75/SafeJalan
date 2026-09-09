@@ -56,9 +56,7 @@ class ReportRepository {
     try {
       await _remote.deleteReport(report.remoteId!);
       await _local.deleteReport(report.id!);
-    } catch (_) {
-      // Keep the local tombstone so the delete can be retried later.
-    }
+    } catch (_) {}
   }
 
   Future<SyncResult> sync() async {
@@ -122,8 +120,6 @@ class ReportRepository {
     try {
       await _remote.upsertReport(report);
       await _local.markSynced(report.id!);
-    } catch (_) {
-      // SQLite remains the source while offline; the next sync retries it.
-    }
+    } catch (_) {}
   }
 }

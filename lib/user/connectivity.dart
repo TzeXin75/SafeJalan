@@ -22,7 +22,6 @@ class ConnectivityScreen extends StatefulWidget {
 class _ConnectivityScreenState extends State<ConnectivityScreen> {
   final _key = GlobalKey<FormState>();
   final _carrier = TextEditingController();
-  // Stores the actual affected area entered by the user.
   final _area = TextEditingController();
   final _notes = TextEditingController();
   String _type = 'Poor Signal';
@@ -44,7 +43,6 @@ class _ConnectivityScreenState extends State<ConnectivityScreen> {
 
   @override
   void dispose() {
-    // Invalidates any location request that is still running.
     _locationRun++;
     _carrier.dispose();
     _area.dispose();
@@ -91,13 +89,12 @@ class _ConnectivityScreenState extends State<ConnectivityScreen> {
   }
 
   Future<void> _detectLocation() async {
-    // Pressing the same button while locating cancels the current request.
     if (_locating) {
       setState(() {
         _locationRun++;
         _locating = false;
         _locationMessage =
-        'GPS detection cancelled. You can enter the area manually.';
+            'GPS detection cancelled. You can enter the area manually.';
       });
       return;
     }
@@ -123,7 +120,7 @@ class _ConnectivityScreenState extends State<ConnectivityScreen> {
           !(await _requestLocationPermission())) {
         if (mounted && locationRun == _locationRun) {
           setState(
-                () => _locationMessage = 'Location permission was not granted.',
+            () => _locationMessage = 'Location permission was not granted.',
           );
         }
         return;
@@ -151,15 +148,15 @@ class _ConnectivityScreenState extends State<ConnectivityScreen> {
     } on TimeoutException {
       if (mounted && locationRun == _locationRun) {
         setState(
-              () => _locationMessage =
-          'GPS timed out. Move near an open area and try again.',
+          () => _locationMessage =
+              'GPS timed out. Move near an open area and try again.',
         );
       }
     } catch (_) {
       if (mounted && locationRun == _locationRun) {
         setState(
-              () => _locationMessage =
-          'Unable to detect GPS. Retry or enter the area manually.',
+          () => _locationMessage =
+              'Unable to detect GPS. Retry or enter the area manually.',
         );
       }
     } finally {
@@ -175,42 +172,38 @@ class _ConnectivityScreenState extends State<ConnectivityScreen> {
       if (!mounted) return;
       if (places.isEmpty) {
         _area.text =
-        '${latitude.toStringAsFixed(5)}, ${longitude.toStringAsFixed(5)}';
+            '${latitude.toStringAsFixed(5)}, ${longitude.toStringAsFixed(5)}';
         return;
       }
 
       final place = places.first;
-      final parts = <String?>[
-        place.street,
-        place.subLocality,
-        place.locality,
-        place.administrativeArea,
-      ]
-          .whereType<String>()
-          .where((part) => part.trim().isNotEmpty)
-          .toSet()
-          .toList();
+      final parts =
+          <String?>[
+                place.street,
+                place.subLocality,
+                place.locality,
+                place.administrativeArea,
+              ]
+              .whereType<String>()
+              .where((part) => part.trim().isNotEmpty)
+              .toSet()
+              .toList();
 
       if (parts.isNotEmpty) {
         _area.text = parts.join(', ');
       } else {
         _area.text =
-        '${latitude.toStringAsFixed(5)}, ${longitude.toStringAsFixed(5)}';
+            '${latitude.toStringAsFixed(5)}, ${longitude.toStringAsFixed(5)}';
       }
     } catch (_) {
-      // Keep the coordinates available even if reverse geocoding fails.
       if (!mounted) return;
       _area.text =
-      '${latitude.toStringAsFixed(5)}, ${longitude.toStringAsFixed(5)}';
+          '${latitude.toStringAsFixed(5)}, ${longitude.toStringAsFixed(5)}';
     }
   }
 
   Future<void> _chooseLocationOnMap() async {
-    // Use the detected position when available; otherwise start from KL.
-    var selected = LatLng(
-      _latitude ?? 3.139,
-      _longitude ?? 101.6869,
-    );
+    var selected = LatLng(_latitude ?? 3.139, _longitude ?? 101.6869);
 
     final result = await showModalBottomSheet<LatLng>(
       context: context,
@@ -241,10 +234,7 @@ class _ConnectivityScreenState extends State<ConnectivityScreen> {
                           ),
                           Text(
                             'Tap anywhere on the map to move the pin',
-                            style: TextStyle(
-                              color: mutedText,
-                              fontSize: 12,
-                            ),
+                            style: TextStyle(color: mutedText, fontSize: 12),
                           ),
                         ],
                       ),
@@ -268,7 +258,7 @@ class _ConnectivityScreenState extends State<ConnectivityScreen> {
                   children: [
                     TileLayer(
                       urlTemplate:
-                      'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+                          'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
                       userAgentPackageName: 'com.safejalan.flutter',
                     ),
                     MarkerLayer(
@@ -328,7 +318,6 @@ class _ConnectivityScreenState extends State<ConnectivityScreen> {
       issueType: _type,
       carrier: _carrier.text.trim(),
       notes: _notes.text.trim(),
-      // Save the user's entered location instead of a hardcoded value.
       area: _area.text.trim(),
     );
     if (!mounted) return;
@@ -352,8 +341,8 @@ class _ConnectivityScreenState extends State<ConnectivityScreen> {
     final items = app.connectivityReports
         .where(
           (report) =>
-      report.reporterEmail.toLowerCase() == app.email.toLowerCase(),
-    )
+              report.reporterEmail.toLowerCase() == app.email.toLowerCase(),
+        )
         .toList();
     return SafeArea(
       child: Column(
@@ -390,23 +379,23 @@ class _ConnectivityScreenState extends State<ConnectivityScreen> {
                     children: ['Poor Signal', 'No Wi-Fi']
                         .map(
                           (value) => Expanded(
-                        child: Padding(
-                          padding: const EdgeInsets.all(4),
-                          child: ChoiceChip(
-                            label: SizedBox(
-                              width: double.infinity,
-                              child: Text(
-                                value,
-                                textAlign: TextAlign.center,
+                            child: Padding(
+                              padding: const EdgeInsets.all(4),
+                              child: ChoiceChip(
+                                label: SizedBox(
+                                  width: double.infinity,
+                                  child: Text(
+                                    value,
+                                    textAlign: TextAlign.center,
+                                  ),
+                                ),
+                                selected: _type == value,
+                                onSelected: (_) =>
+                                    setState(() => _type = value),
                               ),
                             ),
-                            selected: _type == value,
-                            onSelected: (_) =>
-                                setState(() => _type = value),
                           ),
-                        ),
-                      ),
-                    )
+                        )
                         .toList(),
                   ),
                   const SizedBox(height: 12),
@@ -443,9 +432,7 @@ class _ConnectivityScreenState extends State<ConnectivityScreen> {
                           icon: _locating
                               ? const Icon(Icons.close, size: 19)
                               : const Icon(Icons.my_location, size: 19),
-                          label: Text(
-                            _locating ? 'Cancel GPS' : 'Detect GPS',
-                          ),
+                          label: Text(_locating ? 'Cancel GPS' : 'Detect GPS'),
                         ),
                       ),
                       const SizedBox(width: 10),
@@ -464,10 +451,7 @@ class _ConnectivityScreenState extends State<ConnectivityScreen> {
                       child: Text(
                         _locationMessage!,
                         textAlign: TextAlign.center,
-                        style: const TextStyle(
-                          color: mutedText,
-                          fontSize: 11,
-                        ),
+                        style: const TextStyle(color: mutedText, fontSize: 11),
                       ),
                     ),
                   if (_latitude != null && _longitude != null)
@@ -475,12 +459,9 @@ class _ConnectivityScreenState extends State<ConnectivityScreen> {
                       padding: const EdgeInsets.only(top: 5),
                       child: Text(
                         '${_latitude!.toStringAsFixed(5)}, '
-                            '${_longitude!.toStringAsFixed(5)}',
+                        '${_longitude!.toStringAsFixed(5)}',
                         textAlign: TextAlign.center,
-                        style: const TextStyle(
-                          color: mutedText,
-                          fontSize: 11,
-                        ),
+                        style: const TextStyle(color: mutedText, fontSize: 11),
                       ),
                     ),
                   const SizedBox(height: 12),
@@ -512,7 +493,7 @@ class _ConnectivityScreenState extends State<ConnectivityScreen> {
                       ),
                     ),
                   ...items.map(
-                        (item) => Card(
+                    (item) => Card(
                       margin: const EdgeInsets.only(bottom: 10),
                       child: ListTile(
                         onTap: () => Navigator.push(

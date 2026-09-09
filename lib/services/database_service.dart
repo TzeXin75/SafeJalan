@@ -407,9 +407,6 @@ class DatabaseService {
       await db.execute(
         'ALTER TABLE Users ADD COLUMN hasRemoteCopy INTEGER NOT NULL DEFAULT 0',
       );
-      // Synced rows are known remote accounts. Pending rows must be checked
-      // against Supabase before the first upsert, which protects an offline
-      // registration from overwriting an account that already owns the email.
       await db.rawUpdate('''
         UPDATE Users
         SET hasRemoteCopy = CASE WHEN syncStatus = 'synced' THEN 1 ELSE 0 END

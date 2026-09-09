@@ -331,9 +331,7 @@ class _ReportFormScreenState extends State<ReportFormScreen> {
               .toSet()
               .toList();
       if (parts.isNotEmpty) _locationName.text = parts.join(', ');
-    } catch (_) {
-      // Coordinates remain usable when the device geocoder is unavailable.
-    }
+    } catch (_) {}
   }
 
   Future<void> _chooseLocationOnMap() async {

@@ -11,8 +11,6 @@ import 'package:safejalan_native/user/user_home.dart';
 
 const String supabaseUrl = 'https://ubcunymjqlxqznyuvmey.supabase.co';
 
-// Classroom prototype: follows the lecture example by passing the Supabase
-// secret key through anonKey. Do not reuse this setup for a production app.
 const String supabaseKey = '';
 
 void main() {
@@ -33,8 +31,7 @@ Future<void> _bootstrap(AppProvider appProvider) async {
     try {
       await Supabase.initialize(
         url: supabaseUrl,
-        // ignore: deprecated_member_use
-        anonKey: supabaseKey,
+        publishableKey: supabaseKey,
       ).timeout(const Duration(seconds: 8));
       SupabaseService.instance.setInitialisationResult(isConfigured: true);
     } catch (error) {

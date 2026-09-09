@@ -1,6 +1,3 @@
--- SafeJalan remote database (Supabase/PostgreSQL)
--- Run this file once in Supabase Dashboard > SQL Editor.
-
 create extension if not exists pgcrypto;
 
 create table if not exists public.road_reports (
@@ -28,9 +25,6 @@ create index if not exists road_reports_reporter_email_idx
 
 alter table public.road_reports enable row level security;
 
--- Prototype policies: the current app uses its own classroom login screen,
--- so the publishable/anon role needs CRUD access. Replace these policies with
--- auth.uid()-based policies when Supabase Auth is added for production.
 drop policy if exists "prototype_read_reports" on public.road_reports;
 create policy "prototype_read_reports"
   on public.road_reports for select
@@ -59,8 +53,6 @@ create policy "prototype_delete_reports"
 grant select, insert, update, delete on public.road_reports
   to anon, authenticated;
 
--- Remove the previous Supabase Auth profile link, if that version of the
--- classroom project was installed. Existing profile rows are kept.
 drop trigger if exists on_auth_user_created on auth.users;
 drop function if exists public.handle_new_user();
 
@@ -78,8 +70,6 @@ begin
 end
 $$;
 
--- Classroom offline-first account mirror. Passwords are stored only as
--- SHA-256 hashes so the same account can be checked online and offline.
 create table if not exists public.user_profiles (
   email text primary key,
   full_name text not null,
@@ -143,7 +133,6 @@ create policy "prototype_delete_profiles"
 grant select, insert, update, delete on public.user_profiles
   to anon, authenticated;
 
--- Replace the original demo administrator with the project team accounts.
 delete from public.user_profiles
 where lower(email) = 'admin@safejalan.my';
 
@@ -169,8 +158,6 @@ on conflict (email) do update set
   is_active = true,
   updated_at = excluded.updated_at;
 
--- One verification per report and user. The composite primary key prevents
--- the same user from adding a second verification for the same report.
 create table if not exists public.report_verifications (
   report_id uuid not null references public.road_reports(id) on delete cascade,
   user_email text not null,
@@ -215,7 +202,6 @@ create policy "prototype_delete_verifications"
 grant select, insert, update, delete on public.report_verifications
   to anon, authenticated;
 
--- Connectivity reports submitted by users and managed by administrators.
 create table if not exists public.connectivity_reports (
   id uuid primary key default gen_random_uuid(),
   issue_type text not null,
@@ -260,7 +246,6 @@ create policy "prototype_delete_connectivity"
 grant select, insert, update, delete on public.connectivity_reports
   to anon, authenticated;
 
--- Safety notices: administrators perform CRUD; users read active rows in-app.
 create table if not exists public.safety_announcements (
   id uuid primary key default gen_random_uuid(),
   title text not null,
@@ -303,9 +288,6 @@ create policy "prototype_delete_announcements"
 grant select, insert, update, delete on public.safety_announcements
   to anon, authenticated;
 
--- Classroom prototype access. The lecture uses an sb_secret_ key, which is
--- evaluated as service_role. PostgreSQL privileges are still required even
--- though service_role bypasses RLS.
 grant usage on schema public to service_role;
 grant select, insert, update, delete on public.user_profiles
   to service_role;
@@ -318,8 +300,6 @@ grant select, insert, update, delete on public.connectivity_reports
 grant select, insert, update, delete on public.safety_announcements
   to service_role;
 
--- Per-user announcement read receipts. Emergency announcements are marked
--- read by the Flutter app only after the user opens the detail page.
 create table if not exists public.announcement_reads (
   announcement_id uuid not null references public.safety_announcements(id)
     on delete cascade,
@@ -351,9 +331,6 @@ create policy "prototype_update_announcement_reads"
 grant select, insert, update on public.announcement_reads
   to anon, authenticated, service_role;
 
--- Public image bucket for report evidence and profile avatars. The Flutter
--- service also creates it automatically when the classroom service key has
--- permission, so this statement is safe to run more than once.
 insert into storage.buckets (id, name, public)
 values ('safejalan-images', 'safejalan-images', true)
 on conflict (id) do update set public = excluded.public;
