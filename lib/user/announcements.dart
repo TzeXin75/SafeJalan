@@ -13,9 +13,6 @@ class AnnouncementsScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     final app = context.watch<AppProvider>();
     final announcements = app.activeAnnouncements;
-    final unreadNonEmergency = app.unreadAnnouncements.where(
-      (item) => item.priority.toLowerCase() != 'emergency',
-    );
     return Scaffold(
       appBar: AppBar(title: const Text('Safety Announcements')),
       body: RefreshIndicator(
@@ -31,18 +28,13 @@ class AnnouncementsScreen extends StatelessWidget {
             PageTitle(
               'Community Alerts',
               '${app.unreadAnnouncements.length} unread · Official SafeJalan updates',
-              trailing: unreadNonEmergency.isEmpty
+              trailing: app.unreadAnnouncements.isEmpty
                   ? null
                   : TextButton.icon(
                       onPressed: app.markAllNonEmergencyAnnouncementsRead,
                       icon: const Icon(Icons.done_all_rounded),
                       label: const Text('Read all'),
                     ),
-            ),
-            const SizedBox(height: 8),
-            const Text(
-              'Emergency alerts cannot be marked by Read all. Open the detail page to confirm that they were read.',
-              style: TextStyle(color: mutedText, fontSize: 11),
             ),
             const SizedBox(height: 14),
             if (announcements.isEmpty)
@@ -146,7 +138,7 @@ class _AnnouncementCard extends StatelessWidget {
                   ),
                   const Spacer(),
                   Text(
-                    isRead ? 'Read' : 'Tap to read details',
+                    'Details',
                     style: TextStyle(
                       color: isRead ? mutedText : color,
                       fontSize: 11,

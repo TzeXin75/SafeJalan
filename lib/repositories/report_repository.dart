@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:uuid/uuid.dart';
 
 import 'package:safejalan_native/models/report.dart';
@@ -45,7 +47,7 @@ class ReportRepository {
       syncStatus: 'pending',
     );
     await _local.updateReport(pending);
-    await _tryUpload(pending);
+    unawaited(_tryUpload(pending));
   }
 
   Future<void> deleteReport(RoadReport report) async {

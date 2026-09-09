@@ -5,7 +5,7 @@ import 'package:provider/provider.dart';
 
 import 'package:safejalan_native/providers/app_provider.dart';
 import 'package:safejalan_native/widgets/common.dart';
-import 'package:safejalan_native/user/announcements.dart';
+import 'package:safejalan_native/user/notifications.dart';
 import 'package:safejalan_native/user/report_detail.dart';
 
 class MapScreen extends StatelessWidget {
@@ -14,10 +14,9 @@ class MapScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final reports = context.watch<AppProvider>().userVisibleReports;
-    final announcementCount = context
-        .watch<AppProvider>()
-        .unreadAnnouncements
-        .length;
+    final app = context.watch<AppProvider>();
+    final notificationCount =
+        app.unreadAnnouncements.length + app.unreadUserNotifications.length;
     return SafeArea(
       child: Column(
         children: [
@@ -56,7 +55,7 @@ class MapScreen extends StatelessWidget {
                   clipBehavior: Clip.none,
                   children: [
                     IconButton.filledTonal(
-                      tooltip: 'Safety announcements',
+                      tooltip: 'Notifications and announcements',
                       style: IconButton.styleFrom(
                         backgroundColor: const Color(0x1FFFFFFF),
                         foregroundColor: Colors.white,
@@ -64,12 +63,12 @@ class MapScreen extends StatelessWidget {
                       onPressed: () => Navigator.push(
                         context,
                         MaterialPageRoute(
-                          builder: (_) => const AnnouncementsScreen(),
+                          builder: (_) => const UserNotificationsScreen(),
                         ),
                       ),
                       icon: const Icon(Icons.notifications_none_rounded),
                     ),
-                    if (announcementCount > 0)
+                    if (notificationCount > 0)
                       Positioned(
                         top: -2,
                         right: -2,
@@ -77,7 +76,7 @@ class MapScreen extends StatelessWidget {
                           radius: 9,
                           backgroundColor: Colors.red,
                           child: Text(
-                            announcementCount > 9 ? '9+' : '$announcementCount',
+                            notificationCount > 9 ? '9+' : '$notificationCount',
                             style: const TextStyle(
                               color: Colors.white,
                               fontSize: 9,

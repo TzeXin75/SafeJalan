@@ -15,6 +15,9 @@ import 'package:safejalan_native/models/report.dart';
 import 'package:safejalan_native/models/report_categories.dart';
 import 'package:safejalan_native/providers/app_provider.dart';
 import 'package:safejalan_native/widgets/common.dart';
+import 'package:safejalan_native/user/report_detail.dart';
+
+enum _DuplicateAction { viewExisting, submitAnyway }
 
 class ReportFormScreen extends StatefulWidget {
   final VoidCallback onSaved;
@@ -35,6 +38,7 @@ class _ReportFormScreenState extends State<ReportFormScreen> {
   bool _analysingImage = false;
   bool _permissionGranted = false;
   bool _gpsEnabled = false;
+  bool _checkingDuplicates = false;
   String? _aiSuggestion;
   String? _imageError;
   String? _locationMessage;
@@ -453,9 +457,41 @@ class _ReportFormScreenState extends State<ReportFormScreen> {
     } else if (await _image!.length() > 10 * 1024 * 1024) {
       imageError = 'The image must be smaller than 10 MB';
     }
-    if (mounted) setState(() => _imageError = imageError);
+    if (!mounted) return;
+    setState(() => _imageError = imageError);
     final formIsValid = _key.currentState!.validate();
     if (!formIsValid || _imageError != null) return;
+    setState(() => _checkingDuplicates = true);
+    final app = context.read<AppProvider>();
+    final duplicates = app.findDuplicateReports(
+      latitude: _lat,
+      longitude: _lng,
+      category: _category,
+    );
+    if (duplicates.isNotEmpty) {
+      final existing = duplicates.first;
+      final distance = app.distanceToReport(
+        existing,
+        latitude: _lat,
+        longitude: _lng,
+      );
+      final action = await _showDuplicateWarning(existing, distance);
+      if (!mounted) return;
+      if (action == _DuplicateAction.viewExisting) {
+        setState(() => _checkingDuplicates = false);
+        await Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (_) => ReportDetailScreen(report: existing),
+          ),
+        );
+        return;
+      }
+      if (action != _DuplicateAction.submitAnyway) {
+        setState(() => _checkingDuplicates = false);
+        return;
+      }
+    }
     final imagePath = await _saveImage();
     final report = RoadReport(
       title: _title.text.trim(),
@@ -469,7 +505,7 @@ class _ReportFormScreenState extends State<ReportFormScreen> {
       createdOn: DateFormat('yyyy-MM-dd').format(DateTime.now()),
     );
     if (!mounted) return;
-    await context.read<AppProvider>().addReport(report);
+    await app.addReport(report);
     _key.currentState!.reset();
     _title.clear();
     _description.clear();
@@ -478,6 +514,7 @@ class _ReportFormScreenState extends State<ReportFormScreen> {
       _imageError = null;
       _aiSuggestion = null;
       _analysingImage = false;
+      _checkingDuplicates = false;
     });
     if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -486,6 +523,76 @@ class _ReportFormScreenState extends State<ReportFormScreen> {
     }
     widget.onSaved();
   }
+
+  Future<_DuplicateAction?> _showDuplicateWarning(
+    RoadReport existing,
+    double distance,
+  ) => showModalBottomSheet<_DuplicateAction>(
+    context: context,
+    showDragHandle: true,
+    isScrollControlled: true,
+    builder: (context) => SafeArea(
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(20, 4, 20, 24),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                const CircleAvatar(
+                  backgroundColor: Color(0xFFE7ECFF),
+                  child: Icon(Icons.copy_all_rounded, color: primary),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text(
+                        'Similar report found',
+                        style: TextStyle(
+                          color: navy,
+                          fontSize: 19,
+                          fontWeight: FontWeight.w800,
+                        ),
+                      ),
+                      Text(
+                        'A ${existing.category.toLowerCase()} was reported ${distance.round()} m from this location.',
+                        style: const TextStyle(color: mutedText),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 16),
+            ReportTile(report: existing, onTap: () {}),
+            const SizedBox(height: 4),
+            Row(
+              children: [
+                Expanded(
+                  child: OutlinedButton(
+                    onPressed: () =>
+                        Navigator.pop(context, _DuplicateAction.viewExisting),
+                    child: const Text('View existing'),
+                  ),
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: FilledButton(
+                    onPressed: () =>
+                        Navigator.pop(context, _DuplicateAction.submitAnyway),
+                    child: const Text('Submit anyway'),
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    ),
+  );
 
   String? _validateReportText(
     String? value, {
@@ -724,10 +831,14 @@ class _ReportFormScreenState extends State<ReportFormScreen> {
                 ),
                 const SizedBox(height: 18),
                 FilledButton(
-                  onPressed: _submit,
-                  child: const Padding(
-                    padding: EdgeInsets.all(13),
-                    child: Text('Submit Report'),
+                  onPressed: _checkingDuplicates ? null : _submit,
+                  child: Padding(
+                    padding: const EdgeInsets.all(13),
+                    child: Text(
+                      _checkingDuplicates
+                          ? 'Checking nearby reports...'
+                          : 'Submit Report',
+                    ),
                   ),
                 ),
               ],

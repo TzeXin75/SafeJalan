@@ -20,6 +20,7 @@ Color severityColor(String value) => switch (value) {
 Color statusColor(String value) => switch (value.toLowerCase()) {
   'pending' => safeOrange,
   'reviewed' => primary,
+  'in progress' => const Color(0xFF0EA5E9),
   'resolved' => const Color(0xFF16A34A),
   'rejected' => const Color(0xFFDC2626),
   _ => mutedText,

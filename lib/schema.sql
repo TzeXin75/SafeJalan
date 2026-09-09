@@ -11,11 +11,30 @@ create table if not exists public.road_reports (
   longitude double precision not null,
   status text not null default 'Pending',
   image_url text,
+  after_image_url text,
+  responsible_agency text not null default '',
+  scheduled_repair_date date,
+  admin_note text not null default '',
+  completion_note text not null default '',
+  resolved_by text not null default '',
   votes integer not null default 0 check (votes >= 0),
   reporter_email text not null default '',
   created_on date not null default current_date,
   updated_at timestamptz not null default now()
 );
+
+alter table public.road_reports
+  add column if not exists after_image_url text;
+alter table public.road_reports
+  add column if not exists responsible_agency text not null default '';
+alter table public.road_reports
+  add column if not exists scheduled_repair_date date;
+alter table public.road_reports
+  add column if not exists admin_note text not null default '';
+alter table public.road_reports
+  add column if not exists completion_note text not null default '';
+alter table public.road_reports
+  add column if not exists resolved_by text not null default '';
 
 create index if not exists road_reports_created_on_idx
   on public.road_reports (created_on desc);
@@ -329,6 +348,44 @@ create policy "prototype_update_announcement_reads"
   to anon, authenticated using (true) with check (true);
 
 grant select, insert, update on public.announcement_reads
+  to anon, authenticated, service_role;
+
+create table if not exists public.user_notifications (
+  id uuid primary key default gen_random_uuid(),
+  event_key text not null unique,
+  user_email text not null,
+  report_id uuid not null references public.road_reports(id) on delete cascade,
+  title text not null,
+  message text not null,
+  type text not null,
+  created_at timestamptz not null default now(),
+  read_at timestamptz
+);
+
+create index if not exists user_notifications_user_created_idx
+  on public.user_notifications (user_email, created_at desc);
+
+alter table public.user_notifications enable row level security;
+
+drop policy if exists "prototype_read_user_notifications"
+  on public.user_notifications;
+create policy "prototype_read_user_notifications"
+  on public.user_notifications for select
+  to anon, authenticated using (true);
+
+drop policy if exists "prototype_insert_user_notifications"
+  on public.user_notifications;
+create policy "prototype_insert_user_notifications"
+  on public.user_notifications for insert
+  to anon, authenticated with check (true);
+
+drop policy if exists "prototype_update_user_notifications"
+  on public.user_notifications;
+create policy "prototype_update_user_notifications"
+  on public.user_notifications for update
+  to anon, authenticated using (true) with check (true);
+
+grant select, insert, update on public.user_notifications
   to anon, authenticated, service_role;
 
 insert into storage.buckets (id, name, public)

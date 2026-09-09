@@ -4,6 +4,7 @@ import 'dart:convert';
 import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:crypto/crypto.dart';
 import 'package:flutter/material.dart';
+import 'package:latlong2/latlong.dart';
 import 'package:sqflite/sqflite.dart';
 import 'package:uuid/uuid.dart';
 import 'package:safejalan_native/models/connectivity_report.dart';
@@ -11,6 +12,7 @@ import 'package:safejalan_native/models/leaderboard_entry.dart';
 import 'package:safejalan_native/models/user_account.dart';
 import 'package:safejalan_native/models/report.dart';
 import 'package:safejalan_native/models/safety_announcement.dart';
+import 'package:safejalan_native/models/user_notification.dart';
 import 'package:safejalan_native/repositories/report_repository.dart';
 import 'package:safejalan_native/services/database_service.dart';
 import 'package:safejalan_native/services/supabase_service.dart';
@@ -23,6 +25,7 @@ class AppProvider extends ChangeNotifier {
   List<RoadReport> reports = [];
   List<ConnectivityReport> connectivityReports = [];
   List<SafetyAnnouncement> announcements = [];
+  List<UserNotificationItem> userNotifications = [];
   String userName = 'New User';
   String email = '';
   String? profileImagePath;
@@ -57,13 +60,30 @@ class AppProvider extends ChangeNotifier {
   List<RoadReport> get myProfileReports => myReports
       .where((report) => report.status.toLowerCase() != 'archived')
       .toList();
-  List<SafetyAnnouncement> get activeAnnouncements =>
-      announcements.where((announcement) => announcement.isActive).toList();
+  List<SafetyAnnouncement> get activeAnnouncements {
+    final active = announcements
+        .where((announcement) => announcement.isActive)
+        .toList();
+    int priorityOf(SafetyAnnouncement item) =>
+        switch (item.priority.toLowerCase()) {
+          'emergency' => 0,
+          'important' => 1,
+          _ => 2,
+        };
+    active.sort((a, b) {
+      final priority = priorityOf(a).compareTo(priorityOf(b));
+      return priority != 0 ? priority : b.createdAt.compareTo(a.createdAt);
+    });
+    return active;
+  }
+
   List<SafetyAnnouncement> get unreadAnnouncements => activeAnnouncements
       .where(
         (announcement) => !_readAnnouncementIds.contains(announcement.remoteId),
       )
       .toList();
+  List<UserNotificationItem> get unreadUserNotifications =>
+      userNotifications.where((item) => !item.isRead).toList();
 
   bool isAnnouncementRead(SafetyAnnouncement announcement) =>
       _readAnnouncementIds.contains(announcement.remoteId);
@@ -94,6 +114,7 @@ class AppProvider extends ChangeNotifier {
       _applyUser(signedInUser);
       await _loadVerifications();
       await _loadAnnouncementReads();
+      await _loadUserNotifications();
     } else if (signedInUser != null) {
       await _database.saveSignedInUser(null);
     }
@@ -107,6 +128,7 @@ class AppProvider extends ChangeNotifier {
     await syncConnectivityReports();
     await syncSafetyAnnouncements();
     await syncAnnouncementReads();
+    await syncUserNotifications();
     await _syncAllUsers();
     await _refreshCurrentSession();
   }
@@ -162,6 +184,7 @@ class AppProvider extends ChangeNotifier {
       await syncSafetyAnnouncements();
       await _loadAnnouncementReads();
       await syncAnnouncementReads();
+      await syncUserNotifications();
     }
     notifyListeners();
     return null;
@@ -271,6 +294,7 @@ class AppProvider extends ChangeNotifier {
     isAdmin = false;
     _verifiedReportIds.clear();
     _readAnnouncementIds.clear();
+    userNotifications = [];
     notifyListeners();
   }
 
@@ -282,10 +306,187 @@ class AppProvider extends ChangeNotifier {
   }
 
   Future<void> updateStatus(RoadReport report, String status) async {
-    await _reportsRepository.updateReport(report.copyWith(status: status));
+    final updated = report.copyWith(status: status);
+    await _reportsRepository.updateReport(updated);
+    await _createReportStatusNotification(report, updated);
     reports = await _reportsRepository.getLocalReports();
     notifyListeners();
-    await syncReports();
+    unawaited(syncReports());
+    unawaited(syncUserNotifications());
+  }
+
+  Future<void> updateReportMaintenance(
+    RoadReport report, {
+    required String status,
+    required String responsibleAgency,
+    required String scheduledRepairDate,
+    required String adminNote,
+    required String completionNote,
+    String? afterImagePath,
+  }) async {
+    final updated = report.copyWith(
+      status: status,
+      responsibleAgency: responsibleAgency.trim(),
+      scheduledRepairDate: scheduledRepairDate,
+      adminNote: adminNote.trim(),
+      completionNote: completionNote.trim(),
+      afterImagePath: afterImagePath,
+      resolvedBy: status.toLowerCase() == 'resolved'
+          ? email
+          : report.resolvedBy,
+    );
+    await _reportsRepository.updateReport(updated);
+    await _createReportStatusNotification(report, updated);
+    reports = await _reportsRepository.getLocalReports();
+    notifyListeners();
+    unawaited(syncReports());
+    unawaited(syncUserNotifications());
+  }
+
+  List<RoadReport> findDuplicateReports({
+    required double latitude,
+    required double longitude,
+    required String category,
+    double radiusMetres = 100,
+  }) {
+    const distance = Distance();
+    final point = LatLng(latitude, longitude);
+    final cutoff = DateTime.now().subtract(const Duration(days: 30));
+    final matches = reports.where((report) {
+      final status = report.status.toLowerCase();
+      if (report.category.toLowerCase() != category.toLowerCase() ||
+          const {'resolved', 'rejected', 'archived'}.contains(status)) {
+        return false;
+      }
+      final created = DateTime.tryParse(report.createdOn);
+      if (created != null && created.isBefore(cutoff)) return false;
+      return distance.as(
+            LengthUnit.Meter,
+            point,
+            LatLng(report.latitude, report.longitude),
+          ) <=
+          radiusMetres;
+    }).toList();
+    matches.sort((a, b) {
+      final aDistance = distance.as(
+        LengthUnit.Meter,
+        point,
+        LatLng(a.latitude, a.longitude),
+      );
+      final bDistance = distance.as(
+        LengthUnit.Meter,
+        point,
+        LatLng(b.latitude, b.longitude),
+      );
+      return aDistance.compareTo(bDistance);
+    });
+    return matches;
+  }
+
+  double distanceToReport(
+    RoadReport report, {
+    required double latitude,
+    required double longitude,
+  }) => const Distance().as(
+    LengthUnit.Meter,
+    LatLng(latitude, longitude),
+    LatLng(report.latitude, report.longitude),
+  );
+
+  Future<void> _createReportStatusNotification(
+    RoadReport previous,
+    RoadReport updated,
+  ) async {
+    if (previous.status.toLowerCase() == updated.status.toLowerCase() ||
+        updated.reporterEmail.isEmpty ||
+        updated.remoteId == null) {
+      return;
+    }
+    final copy = switch (updated.status.toLowerCase()) {
+      'reviewed' => (
+        'Report reviewed',
+        'Admin reviewed your report ${updated.title}.',
+        'reviewed',
+      ),
+      'in progress' => (
+        'Repair has started',
+        'Your report ${updated.title} is now In Progress.',
+        'in_progress',
+      ),
+      'resolved' => (
+        'Road repaired',
+        'Your report ${updated.title} was marked Resolved. View the result.',
+        'resolved',
+      ),
+      'rejected' => (
+        'Report rejected',
+        'Your report ${updated.title} was not approved. View the details.',
+        'rejected',
+      ),
+      _ => null,
+    };
+    if (copy == null) return;
+    final now = DateTime.now().toUtc().toIso8601String();
+    await _database.insertUserNotification(
+      UserNotificationItem(
+        remoteId: _uuid.v4(),
+        eventKey: '${updated.remoteId}|${updated.status.toLowerCase()}|$now',
+        userEmail: updated.reporterEmail,
+        reportRemoteId: updated.remoteId!,
+        title: copy.$1,
+        message: copy.$2,
+        type: copy.$3,
+        createdAt: now,
+      ),
+    );
+    if (updated.reporterEmail.toLowerCase() == email.toLowerCase()) {
+      await _loadUserNotifications();
+    }
+  }
+
+  Future<void> _loadUserNotifications() async {
+    userNotifications = await _database.getUserNotifications(email);
+  }
+
+  Future<void> markUserNotificationRead(
+    UserNotificationItem notification,
+  ) async {
+    if (!notification.isRead) {
+      await _database.markUserNotificationRead(notification.remoteId);
+      await _loadUserNotifications();
+      notifyListeners();
+      await syncUserNotifications();
+    }
+  }
+
+  Future<void> markAllUserNotificationsRead() async {
+    final unread = List<UserNotificationItem>.from(unreadUserNotifications);
+    for (final notification in unread) {
+      await _database.markUserNotificationRead(notification.remoteId);
+    }
+    await _loadUserNotifications();
+    notifyListeners();
+    unawaited(syncUserNotifications());
+  }
+
+  Future<void> syncUserNotifications() async {
+    if (_supabase.isConfigured) {
+      try {
+        final pending = await _database.getPendingUserNotifications();
+        for (final notification in pending) {
+          await _supabase.upsertUserNotification(notification);
+          await _database.markUserNotificationSynced(notification.remoteId);
+        }
+        if (email.isNotEmpty) {
+          final remote = await _supabase.getUserNotifications(email);
+          await _database.mergeRemoteUserNotifications(remote);
+        }
+      } catch (error) {
+        debugPrint('[SafeJalan sync] User notifications failed: $error');
+      }
+    }
+    if (email.isNotEmpty) await _loadUserNotifications();
+    notifyListeners();
   }
 
   Future<bool> toggleVerification(RoadReport report) async {
@@ -499,7 +700,7 @@ class AppProvider extends ChangeNotifier {
       _readAnnouncementIds.add(announcement.remoteId);
     }
     notifyListeners();
-    await syncAnnouncementReads();
+    unawaited(syncAnnouncementReads());
   }
 
   Future<void> syncAnnouncementReads() async {
@@ -569,6 +770,7 @@ class AppProvider extends ChangeNotifier {
     await syncConnectivityReports();
     await syncSafetyAnnouncements();
     await syncAnnouncementReads();
+    await syncUserNotifications();
     await _syncAllUsers();
     await _refreshCurrentSession();
   }

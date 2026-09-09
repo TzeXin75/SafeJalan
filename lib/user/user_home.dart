@@ -7,7 +7,7 @@ import 'package:safejalan_native/user/report_form.dart';
 import 'package:safejalan_native/user/connectivity.dart';
 import 'package:safejalan_native/user/leaderboard.dart';
 import 'package:safejalan_native/user/profile.dart';
-import 'package:safejalan_native/user/announcements.dart';
+import 'package:safejalan_native/user/notifications.dart';
 import 'package:safejalan_native/widgets/common.dart';
 
 class UserHome extends StatefulWidget {
@@ -71,7 +71,9 @@ class _UserHomeState extends State<UserHome> {
     if (openAnnouncements == true && mounted) {
       await Navigator.push(
         context,
-        MaterialPageRoute(builder: (_) => const AnnouncementsScreen()),
+        MaterialPageRoute(
+          builder: (_) => const UserNotificationsScreen(initialTab: 1),
+        ),
       );
     }
   }

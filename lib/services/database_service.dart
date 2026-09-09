@@ -5,6 +5,7 @@ import 'package:safejalan_native/models/connectivity_report.dart';
 import 'package:safejalan_native/models/report.dart';
 import 'package:safejalan_native/models/safety_announcement.dart';
 import 'package:safejalan_native/models/user_account.dart';
+import 'package:safejalan_native/models/user_notification.dart';
 
 class DatabaseService {
   DatabaseService._internal();
@@ -45,7 +46,7 @@ class DatabaseService {
     final directory = await getApplicationDocumentsDirectory();
     return openDatabase(
       '${directory.path}/safejalan.db',
-      version: 11,
+      version: 12,
       onCreate: (db, version) async {
         await _createReportsTable(db);
         await _createUserTables(db);
@@ -53,6 +54,7 @@ class DatabaseService {
         await _createConnectivityReportsTable(db);
         await _createSafetyAnnouncementsTable(db);
         await _createAnnouncementReadsTable(db);
+        await _createUserNotificationsTable(db);
       },
       onUpgrade: (db, oldVersion, newVersion) async {
         if (oldVersion < 2) {
@@ -85,6 +87,27 @@ class DatabaseService {
         if (oldVersion < 9) await _replaceDefaultAdmins(db);
         if (oldVersion < 10) await _migrateUserRemoteTracking(db);
         if (oldVersion < 11) await _createAnnouncementReadsTable(db);
+        if (oldVersion < 12) {
+          await db.execute(
+            "ALTER TABLE Reports ADD COLUMN afterImagePath TEXT",
+          );
+          await db.execute(
+            "ALTER TABLE Reports ADD COLUMN responsibleAgency TEXT NOT NULL DEFAULT ''",
+          );
+          await db.execute(
+            "ALTER TABLE Reports ADD COLUMN scheduledRepairDate TEXT NOT NULL DEFAULT ''",
+          );
+          await db.execute(
+            "ALTER TABLE Reports ADD COLUMN adminNote TEXT NOT NULL DEFAULT ''",
+          );
+          await db.execute(
+            "ALTER TABLE Reports ADD COLUMN completionNote TEXT NOT NULL DEFAULT ''",
+          );
+          await db.execute(
+            "ALTER TABLE Reports ADD COLUMN resolvedBy TEXT NOT NULL DEFAULT ''",
+          );
+          await _createUserNotificationsTable(db);
+        }
       },
     );
   }
@@ -148,6 +171,96 @@ class DatabaseService {
         PRIMARY KEY(announcementRemoteId, userEmail)
       )
     ''');
+  }
+
+  Future<void> _createUserNotificationsTable(Database db) async {
+    await db.execute('''
+      CREATE TABLE IF NOT EXISTS UserNotifications(
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        remoteId TEXT NOT NULL UNIQUE,
+        eventKey TEXT NOT NULL UNIQUE,
+        userEmail TEXT NOT NULL COLLATE NOCASE,
+        reportRemoteId TEXT NOT NULL,
+        title TEXT NOT NULL,
+        message TEXT NOT NULL,
+        type TEXT NOT NULL,
+        createdAt TEXT NOT NULL,
+        readAt TEXT,
+        syncStatus TEXT NOT NULL DEFAULT 'pending'
+      )
+    ''');
+  }
+
+  Future<List<UserNotificationItem>> getUserNotifications(
+    String userEmail,
+  ) async {
+    if (userEmail.isEmpty) return const [];
+    final rows = await (await database).query(
+      'UserNotifications',
+      where: 'userEmail = ? COLLATE NOCASE',
+      whereArgs: [userEmail],
+      orderBy: 'createdAt DESC',
+    );
+    return rows.map(UserNotificationItem.fromLocalMap).toList();
+  }
+
+  Future<void> insertUserNotification(UserNotificationItem notification) async {
+    await (await database).insert(
+      'UserNotifications',
+      notification.toLocalMap(),
+      conflictAlgorithm: ConflictAlgorithm.ignore,
+    );
+  }
+
+  Future<void> markUserNotificationRead(String remoteId) async {
+    await (await database).update(
+      'UserNotifications',
+      {
+        'readAt': DateTime.now().toUtc().toIso8601String(),
+        'syncStatus': 'pending',
+      },
+      where: 'remoteId = ?',
+      whereArgs: [remoteId],
+    );
+  }
+
+  Future<List<UserNotificationItem>> getPendingUserNotifications() async {
+    final rows = await (await database).query(
+      'UserNotifications',
+      where: "syncStatus = 'pending'",
+    );
+    return rows.map(UserNotificationItem.fromLocalMap).toList();
+  }
+
+  Future<void> markUserNotificationSynced(String remoteId) async {
+    await (await database).update(
+      'UserNotifications',
+      {'syncStatus': 'synced'},
+      where: 'remoteId = ?',
+      whereArgs: [remoteId],
+    );
+  }
+
+  Future<void> mergeRemoteUserNotifications(
+    List<UserNotificationItem> notifications,
+  ) async {
+    final db = await database;
+    for (final notification in notifications) {
+      final existing = await db.query(
+        'UserNotifications',
+        where: 'remoteId = ?',
+        whereArgs: [notification.remoteId],
+        limit: 1,
+      );
+      if (existing.isNotEmpty && existing.first['syncStatus'] == 'pending') {
+        continue;
+      }
+      await db.insert(
+        'UserNotifications',
+        notification.toLocalMap(),
+        conflictAlgorithm: ConflictAlgorithm.replace,
+      );
+    }
   }
 
   Future<Set<String>> getReadAnnouncementIds(String userEmail) async {
@@ -325,6 +438,12 @@ class DatabaseService {
         email TEXT NOT NULL UNIQUE COLLATE NOCASE,
         passwordHash TEXT NOT NULL,
         imagePath TEXT,
+        afterImagePath TEXT,
+        responsibleAgency TEXT NOT NULL DEFAULT '',
+        scheduledRepairDate TEXT NOT NULL DEFAULT '',
+        adminNote TEXT NOT NULL DEFAULT '',
+        completionNote TEXT NOT NULL DEFAULT '',
+        resolvedBy TEXT NOT NULL DEFAULT '',
         isAdmin INTEGER NOT NULL DEFAULT 0,
         isActive INTEGER NOT NULL DEFAULT 1,
         syncStatus TEXT NOT NULL DEFAULT 'pending',
@@ -722,6 +841,26 @@ class DatabaseService {
               !existing.imagePath!.startsWith('http')
           ? existing.imagePath
           : report.imagePath ?? existing.imagePath,
+      afterImagePath:
+          existing.afterImagePath?.isNotEmpty == true &&
+              !existing.afterImagePath!.startsWith('http')
+          ? existing.afterImagePath
+          : report.afterImagePath ?? existing.afterImagePath,
+      responsibleAgency: report.responsibleAgency.isEmpty
+          ? existing.responsibleAgency
+          : report.responsibleAgency,
+      scheduledRepairDate: report.scheduledRepairDate.isEmpty
+          ? existing.scheduledRepairDate
+          : report.scheduledRepairDate,
+      adminNote: report.adminNote.isEmpty
+          ? existing.adminNote
+          : report.adminNote,
+      completionNote: report.completionNote.isEmpty
+          ? existing.completionNote
+          : report.completionNote,
+      resolvedBy: report.resolvedBy.isEmpty
+          ? existing.resolvedBy
+          : report.resolvedBy,
       syncStatus: 'synced',
     );
     await updateReport(merged);

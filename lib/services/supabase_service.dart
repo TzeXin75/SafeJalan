@@ -6,6 +6,7 @@ import 'package:safejalan_native/models/connectivity_report.dart';
 import 'package:safejalan_native/models/report.dart';
 import 'package:safejalan_native/models/safety_announcement.dart';
 import 'package:safejalan_native/models/user_account.dart';
+import 'package:safejalan_native/models/user_notification.dart';
 
 class SupabaseService {
   SupabaseService._internal();
@@ -47,7 +48,26 @@ class SupabaseService {
       fileName: report.remoteId ?? report.id?.toString() ?? 'report',
     );
     if (imageUrl != null) values['image_url'] = imageUrl;
-    await _client.from('road_reports').upsert(values, onConflict: 'id');
+    final afterImageUrl = await _uploadLocalImage(
+      localPath: report.afterImagePath,
+      folder: 'report-results',
+      fileName: report.remoteId ?? report.id?.toString() ?? 'report-result',
+    );
+    if (afterImageUrl != null) values['after_image_url'] = afterImageUrl;
+    try {
+      await _client.from('road_reports').upsert(values, onConflict: 'id');
+    } on PostgrestException {
+      final compatibleValues = Map<String, dynamic>.from(values)
+        ..remove('after_image_url')
+        ..remove('responsible_agency')
+        ..remove('scheduled_repair_date')
+        ..remove('admin_note')
+        ..remove('completion_note')
+        ..remove('resolved_by');
+      await _client
+          .from('road_reports')
+          .upsert(compatibleValues, onConflict: 'id');
+    }
   }
 
   Future<void> deleteReport(String remoteId) async {
@@ -146,6 +166,23 @@ class SupabaseService {
         .select('announcement_id, user_email, read_at')
         .eq('user_email', userEmail.toLowerCase());
     return rows.map((row) => Map<String, dynamic>.from(row)).toList();
+  }
+
+  Future<void> upsertUserNotification(UserNotificationItem notification) async {
+    await _client
+        .from('user_notifications')
+        .upsert(notification.toRemoteMap(), onConflict: 'id');
+  }
+
+  Future<List<UserNotificationItem>> getUserNotifications(
+    String userEmail,
+  ) async {
+    final rows = await _client
+        .from('user_notifications')
+        .select()
+        .eq('user_email', userEmail.toLowerCase())
+        .order('created_at', ascending: false);
+    return rows.map(UserNotificationItem.fromRemoteMap).toList();
   }
 
   Future<void> upsertUserProfile(

@@ -97,20 +97,6 @@ class _AnnouncementDetailScreenState extends State<AnnouncementDetailScreen> {
             announcement.message,
             style: const TextStyle(fontSize: 16, height: 1.6),
           ),
-          const SizedBox(height: 24),
-          Row(
-            children: [
-              const Icon(Icons.done_all_rounded, color: safeTeal),
-              const SizedBox(width: 8),
-              Text(
-                'Marked as read for ${context.watch<AppProvider>().userName}',
-                style: const TextStyle(
-                  color: safeTeal,
-                  fontWeight: FontWeight.w700,
-                ),
-              ),
-            ],
-          ),
         ],
       ),
     );

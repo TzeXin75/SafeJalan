@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 import 'package:safejalan_native/models/report.dart';
 import 'package:safejalan_native/models/report_categories.dart';
@@ -25,6 +26,9 @@ class ReportDetailScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     final app = context.watch<AppProvider>();
     final current = app.latestVersionOf(report);
+    final isResolved = current.status.toLowerCase() == 'resolved';
+    final isOwnReport =
+        current.reporterEmail.toLowerCase() == app.email.toLowerCase();
     final verified = app.hasVerified(current);
     final updating = app.isUpdatingVerification(current);
     final canModify = app.canModifyOwnReport(current);
@@ -34,23 +38,69 @@ class ReportDetailScreen extends StatelessWidget {
       'archived',
     }.contains(current.status.toLowerCase());
     return Scaffold(
-      appBar: AppBar(title: const Text('Report Detail')),
+      appBar: AppBar(
+        title: Text(
+          isResolved
+              ? 'Repair Result'
+              : isOwnReport
+              ? 'Report Progress'
+              : 'Report Detail',
+        ),
+      ),
       body: ListView(
         padding: const EdgeInsets.all(16),
         children: [
-          ZoomableStoredImage(
-            path: current.imagePath,
-            fallback: ColoredBox(
-              color: severityColor(current.severity).withValues(alpha: .1),
-              child: Center(
-                child: Icon(
-                  Icons.add_road,
-                  size: 76,
-                  color: severityColor(current.severity),
-                ),
+          if (isResolved) ...[
+            Container(
+              padding: const EdgeInsets.all(14),
+              decoration: BoxDecoration(
+                color: safeTeal.withValues(alpha: .1),
+                borderRadius: BorderRadius.circular(16),
+              ),
+              child: Row(
+                children: [
+                  const Icon(Icons.check_circle_rounded, color: safeTeal),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Text(
+                      'Repair completed${current.responsibleAgency.isEmpty ? '' : ' by ${current.responsibleAgency}'}',
+                      style: const TextStyle(
+                        color: safeTeal,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                  ),
+                ],
               ),
             ),
-          ),
+            const SizedBox(height: 14),
+          ],
+          if (isResolved && current.afterImagePath?.isNotEmpty == true)
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Expanded(
+                  child: _EvidencePhoto(
+                    label: 'Before',
+                    path: current.imagePath,
+                    report: current,
+                  ),
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: _EvidencePhoto(
+                    label: 'After',
+                    path: current.afterImagePath,
+                    report: current,
+                  ),
+                ),
+              ],
+            )
+          else
+            ZoomableStoredImage(
+              path: current.imagePath,
+              fallback: _imageFallback(current),
+            ),
           const SizedBox(height: 16),
           Wrap(
             spacing: 8,
@@ -82,6 +132,64 @@ class ReportDetailScreen extends StatelessWidget {
             'Reported on ${current.createdOn}',
             style: const TextStyle(color: Colors.blueGrey),
           ),
+          if (isOwnReport &&
+              !const {
+                'rejected',
+                'archived',
+              }.contains(current.status.toLowerCase())) ...[
+            const SizedBox(height: 18),
+            _ReportProgressCard(report: current),
+          ],
+          if (current.responsibleAgency.isNotEmpty ||
+              current.scheduledRepairDate.isNotEmpty ||
+              current.adminNote.isNotEmpty ||
+              current.completionNote.isNotEmpty) ...[
+            const SizedBox(height: 18),
+            Card(
+              child: Padding(
+                padding: const EdgeInsets.all(16),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      current.status.toLowerCase() == 'resolved'
+                          ? 'Completion details'
+                          : 'Maintenance details',
+                      style: const TextStyle(
+                        color: navy,
+                        fontSize: 17,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                    if (current.responsibleAgency.isNotEmpty)
+                      _MaintenanceRow(
+                        Icons.apartment_outlined,
+                        'Responsible agency',
+                        current.responsibleAgency,
+                      ),
+                    if (current.scheduledRepairDate.isNotEmpty)
+                      _MaintenanceRow(
+                        Icons.calendar_today_outlined,
+                        'Scheduled date',
+                        current.scheduledRepairDate,
+                      ),
+                    if (current.adminNote.isNotEmpty)
+                      _MaintenanceRow(
+                        Icons.notes_outlined,
+                        'Admin note',
+                        current.adminNote,
+                      ),
+                    if (current.completionNote.isNotEmpty)
+                      _MaintenanceRow(
+                        Icons.fact_check_outlined,
+                        'Completion note',
+                        current.completionNote,
+                      ),
+                  ],
+                ),
+              ),
+            ),
+          ],
           if (canModify) ...[
             const SizedBox(height: 18),
             Row(
@@ -214,6 +322,236 @@ class ReportDetailScreen extends StatelessWidget {
       ).showSnackBar(SnackBar(content: Text(error)));
     }
   }
+}
+
+Widget _imageFallback(RoadReport report) => ColoredBox(
+  color: severityColor(report.severity).withValues(alpha: .1),
+  child: Center(
+    child: Icon(
+      Icons.add_road,
+      size: 76,
+      color: severityColor(report.severity),
+    ),
+  ),
+);
+
+class _ReportProgressCard extends StatelessWidget {
+  const _ReportProgressCard({required this.report});
+
+  final RoadReport report;
+
+  int get _stage => switch (report.status.toLowerCase()) {
+    'reviewed' => 1,
+    'in progress' => 2,
+    'resolved' => 3,
+    _ => 0,
+  };
+
+  String _date(String value) {
+    final parsed = DateTime.tryParse(value)?.toLocal();
+    if (parsed == null) return value;
+    return value.contains('T')
+        ? DateFormat('d MMM yyyy · h:mm a').format(parsed)
+        : DateFormat('d MMM yyyy').format(parsed);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final updated = report.updatedAt.isEmpty ? '' : _date(report.updatedAt);
+    final agency = report.responsibleAgency;
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(18, 18, 18, 10),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text(
+              'Status history',
+              style: TextStyle(
+                color: navy,
+                fontSize: 20,
+                fontWeight: FontWeight.w800,
+              ),
+            ),
+            const SizedBox(height: 18),
+            _ProgressStep(
+              title: 'Report submitted',
+              detail: _date(report.createdOn),
+              completed: true,
+            ),
+            _ProgressStep(
+              title: 'Reviewed by admin',
+              detail: _stage >= 1
+                  ? (_stage == 1 && updated.isNotEmpty ? updated : 'Completed')
+                  : 'Waiting for review',
+              completed: _stage > 1,
+              current: _stage == 1,
+            ),
+            _ProgressStep(
+              title: 'Repair in progress',
+              detail: _stage >= 2
+                  ? [
+                      if (agency.isNotEmpty) '$agency assigned',
+                      if (_stage == 2 && updated.isNotEmpty) updated,
+                      if (agency.isEmpty && (_stage != 2 || updated.isEmpty))
+                        'Completed',
+                    ].join(' · ')
+                  : 'Waiting for repair',
+              completed: _stage > 2,
+              current: _stage == 2,
+            ),
+            _ProgressStep(
+              title: 'Repair completed',
+              detail: _stage == 3
+                  ? (updated.isEmpty ? 'Completed' : updated)
+                  : 'Waiting for completion',
+              completed: _stage == 3,
+              isLast: true,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _ProgressStep extends StatelessWidget {
+  const _ProgressStep({
+    required this.title,
+    required this.detail,
+    this.completed = false,
+    this.current = false,
+    this.isLast = false,
+  });
+
+  final String title;
+  final String detail;
+  final bool completed;
+  final bool current;
+  final bool isLast;
+
+  @override
+  Widget build(BuildContext context) {
+    final color = completed
+        ? safeTeal
+        : current
+        ? safeOrange
+        : const Color(0xFFCBD5E1);
+    return SizedBox(
+      height: isLast ? 62 : 82,
+      child: Stack(
+        children: [
+          if (!isLast)
+            Positioned(
+              left: 17,
+              top: 34,
+              bottom: 0,
+              child: Container(
+                width: 3,
+                color: completed ? safeTeal : const Color(0xFFD8E0E8),
+              ),
+            ),
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Container(
+                width: 36,
+                height: 36,
+                decoration: BoxDecoration(color: color, shape: BoxShape.circle),
+                child: Icon(
+                  completed ? Icons.check_rounded : Icons.circle_outlined,
+                  color: Colors.white,
+                  size: completed ? 23 : 18,
+                ),
+              ),
+              const SizedBox(width: 14),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      title,
+                      style: const TextStyle(
+                        color: navy,
+                        fontSize: 16,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      detail,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(color: mutedText, fontSize: 12),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _EvidencePhoto extends StatelessWidget {
+  const _EvidencePhoto({
+    required this.label,
+    required this.path,
+    required this.report,
+  });
+
+  final String label;
+  final String? path;
+  final RoadReport report;
+
+  @override
+  Widget build(BuildContext context) => Column(
+    crossAxisAlignment: CrossAxisAlignment.start,
+    children: [
+      LabelBadge(label, label == 'After' ? primary : mutedText),
+      const SizedBox(height: 7),
+      ZoomableStoredImage(
+        path: path,
+        height: 180,
+        fallback: _imageFallback(report),
+      ),
+    ],
+  );
+}
+
+class _MaintenanceRow extends StatelessWidget {
+  const _MaintenanceRow(this.icon, this.label, this.value);
+
+  final IconData icon;
+  final String label;
+  final String value;
+
+  @override
+  Widget build(BuildContext context) => Padding(
+    padding: const EdgeInsets.only(top: 13),
+    child: Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Icon(icon, color: primary, size: 20),
+        const SizedBox(width: 10),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                label,
+                style: const TextStyle(color: mutedText, fontSize: 11),
+              ),
+              const SizedBox(height: 2),
+              Text(value, style: const TextStyle(fontWeight: FontWeight.w600)),
+            ],
+          ),
+        ),
+      ],
+    ),
+  );
 }
 
 class _ReportInput {

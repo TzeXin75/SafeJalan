@@ -13,6 +13,12 @@ class RoadReport {
   final double latitude;
   final double longitude;
   final String? imagePath;
+  final String? afterImagePath;
+  final String responsibleAgency;
+  final String scheduledRepairDate;
+  final String adminNote;
+  final String completionNote;
+  final String resolvedBy;
   final int votes;
   final String syncStatus;
   final bool isDeleted;
@@ -29,6 +35,12 @@ class RoadReport {
     required this.longitude,
     this.status = 'Pending',
     this.imagePath,
+    this.afterImagePath,
+    this.responsibleAgency = '',
+    this.scheduledRepairDate = '',
+    this.adminNote = '',
+    this.completionNote = '',
+    this.resolvedBy = '',
     this.votes = 0,
     required this.createdOn,
     this.updatedAt = '',
@@ -49,6 +61,12 @@ class RoadReport {
     longitude: (data['longitude'] as num).toDouble(),
     status: data['status'] as String,
     imagePath: data['imagePath'] as String?,
+    afterImagePath: data['afterImagePath'] as String?,
+    responsibleAgency: data['responsibleAgency'] as String? ?? '',
+    scheduledRepairDate: data['scheduledRepairDate'] as String? ?? '',
+    adminNote: data['adminNote'] as String? ?? '',
+    completionNote: data['completionNote'] as String? ?? '',
+    resolvedBy: data['resolvedBy'] as String? ?? '',
     votes: data['votes'] as int,
     createdOn: data['createdOn'] as String,
     updatedAt: data['updatedAt'] as String? ?? '',
@@ -68,6 +86,12 @@ class RoadReport {
     longitude: (data['longitude'] as num).toDouble(),
     status: data['status'] as String,
     imagePath: data['image_url'] as String?,
+    afterImagePath: data['after_image_url'] as String?,
+    responsibleAgency: data['responsible_agency'] as String? ?? '',
+    scheduledRepairDate: data['scheduled_repair_date'] as String? ?? '',
+    adminNote: data['admin_note'] as String? ?? '',
+    completionNote: data['completion_note'] as String? ?? '',
+    resolvedBy: data['resolved_by'] as String? ?? '',
     votes: data['votes'] as int? ?? 0,
     createdOn: data['created_on'] as String,
     updatedAt: data['updated_at'] as String? ?? '',
@@ -87,6 +111,12 @@ class RoadReport {
     'longitude': longitude,
     'status': status,
     'imagePath': imagePath,
+    'afterImagePath': afterImagePath,
+    'responsibleAgency': responsibleAgency,
+    'scheduledRepairDate': scheduledRepairDate,
+    'adminNote': adminNote,
+    'completionNote': completionNote,
+    'resolvedBy': resolvedBy,
     'votes': votes,
     'createdOn': createdOn,
     'updatedAt': updatedAt,
@@ -106,6 +136,16 @@ class RoadReport {
     'longitude': longitude,
     'status': status,
     'image_url': imagePath?.startsWith('http') == true ? imagePath : null,
+    'after_image_url': afterImagePath?.startsWith('http') == true
+        ? afterImagePath
+        : null,
+    'responsible_agency': responsibleAgency,
+    'scheduled_repair_date': scheduledRepairDate.isEmpty
+        ? null
+        : scheduledRepairDate,
+    'admin_note': adminNote,
+    'completion_note': completionNote,
+    'resolved_by': resolvedBy,
     'votes': votes,
     'created_on': createdOn,
     'updated_at': updatedAt,
@@ -129,6 +169,12 @@ class RoadReport {
     String? syncStatus,
     bool? isDeleted,
     String? imagePath,
+    String? afterImagePath,
+    String? responsibleAgency,
+    String? scheduledRepairDate,
+    String? adminNote,
+    String? completionNote,
+    String? resolvedBy,
   }) => RoadReport(
     id: id ?? this.id,
     remoteId: remoteId ?? this.remoteId,
@@ -141,6 +187,12 @@ class RoadReport {
     longitude: longitude ?? this.longitude,
     status: status ?? this.status,
     imagePath: imagePath ?? this.imagePath,
+    afterImagePath: afterImagePath ?? this.afterImagePath,
+    responsibleAgency: responsibleAgency ?? this.responsibleAgency,
+    scheduledRepairDate: scheduledRepairDate ?? this.scheduledRepairDate,
+    adminNote: adminNote ?? this.adminNote,
+    completionNote: completionNote ?? this.completionNote,
+    resolvedBy: resolvedBy ?? this.resolvedBy,
     votes: votes ?? this.votes,
     createdOn: createdOn,
     updatedAt: updatedAt ?? this.updatedAt,
