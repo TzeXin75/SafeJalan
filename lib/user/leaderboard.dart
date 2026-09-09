@@ -110,8 +110,11 @@ class _LeaderboardScreenState extends State<LeaderboardScreen> {
                   );
                 }
                 final rawEntries = snapshot.data ?? [];
-                final withPoints = rawEntries
-                    .where((entry) => entry.points >= 1)
+                final entries = rawEntries
+                    .where(
+                      (entry) =>
+                          entry.points >= 1 && entry.email != currentEmail,
+                    )
                     .toList();
 
                 LeaderboardEntry? myEntry;
@@ -122,12 +125,7 @@ class _LeaderboardScreenState extends State<LeaderboardScreen> {
                   }
                 }
 
-                final entries = [
-                  ...withPoints.where((entry) => entry.email != currentEmail),
-                  if (myEntry != null) myEntry,
-                ];
-
-                if (entries.isEmpty) {
+                if (entries.isEmpty && myEntry == null) {
                   return _LeaderboardMessage(
                     icon: Icons.leaderboard_outlined,
                     title: 'No registered users yet',
@@ -135,70 +133,75 @@ class _LeaderboardScreenState extends State<LeaderboardScreen> {
                     onRetry: _refresh,
                   );
                 }
-                return RefreshIndicator(
-                  onRefresh: _refresh,
-                  child: ListView.separated(
-                    physics: const AlwaysScrollableScrollPhysics(),
-                    padding: const EdgeInsets.all(16),
-                    itemCount: entries.length,
-                    separatorBuilder: (_, _) => const SizedBox(height: 9),
-                    itemBuilder: (context, index) {
-                      final entry = entries[index];
-                      final isCurrentUser = entry.email == currentEmail;
-                      return Card(
-                        color: isCurrentUser
-                            ? primary.withValues(alpha: .06)
-                            : Colors.white,
-                        child: Padding(
-                          padding: const EdgeInsets.symmetric(vertical: 3),
-                          child: ListTile(
-                            leading: CircleAvatar(
-                              backgroundColor: _rankColor(index),
-                              foregroundColor: index < 3 ? navy : Colors.white,
-                              child: Text(
-                                '${index + 1}',
-                                style: const TextStyle(
-                                  fontWeight: FontWeight.w900,
-                                ),
-                              ),
-                            ),
-                            title: Row(
-                              children: [
-                                Flexible(
-                                  child: Text(
-                                    entry.name,
-                                    overflow: TextOverflow.ellipsis,
-                                    style: const TextStyle(
-                                      fontWeight: FontWeight.w800,
+
+                return Column(
+                  children: [
+                    Expanded(
+                      child: entries.isEmpty
+                          ? _LeaderboardMessage(
+                              icon: Icons.leaderboard_outlined,
+                              title: 'No ranked reporters yet',
+                              message:
+                                  'Reporters with at least 1 point will appear here.',
+                              onRetry: _refresh,
+                            )
+                          : RefreshIndicator(
+                              onRefresh: _refresh,
+                              child: ListView.separated(
+                                physics: const AlwaysScrollableScrollPhysics(),
+                                padding: const EdgeInsets.all(16),
+                                itemCount: entries.length,
+                                separatorBuilder: (_, _) =>
+                                    const SizedBox(height: 9),
+                                itemBuilder: (context, index) {
+                                  final entry = entries[index];
+                                  return Card(
+                                    color: Colors.white,
+                                    child: Padding(
+                                      padding: const EdgeInsets.symmetric(
+                                        vertical: 3,
+                                      ),
+                                      child: ListTile(
+                                        leading: CircleAvatar(
+                                          backgroundColor: _rankColor(index),
+                                          foregroundColor: index < 3
+                                              ? navy
+                                              : Colors.white,
+                                          child: Text(
+                                            '${index + 1}',
+                                            style: const TextStyle(
+                                              fontWeight: FontWeight.w900,
+                                            ),
+                                          ),
+                                        ),
+                                        title: Text(
+                                          entry.name,
+                                          overflow: TextOverflow.ellipsis,
+                                          style: const TextStyle(
+                                            fontWeight: FontWeight.w800,
+                                          ),
+                                        ),
+                                        subtitle: Text(
+                                          '${entry.reportCount} reports · '
+                                          '${entry.verificationCount} verifications',
+                                        ),
+                                        trailing: Text(
+                                          '${entry.points}\npoints',
+                                          textAlign: TextAlign.right,
+                                          style: const TextStyle(
+                                            color: primary,
+                                            fontWeight: FontWeight.w800,
+                                          ),
+                                        ),
+                                      ),
                                     ),
-                                  ),
-                                ),
-                                if (isCurrentUser) ...[
-                                  const SizedBox(width: 7),
-                                  const Chip(
-                                    visualDensity: VisualDensity.compact,
-                                    label: Text('You'),
-                                  ),
-                                ],
-                              ],
-                            ),
-                            subtitle: Text(
-                              '${entry.reportCount} reports · '
-                              '${entry.verificationCount} verifications',
-                            ),
-                            trailing: Text(
-                              '${entry.points}\npoints',
-                              textAlign: TextAlign.right,
-                              style: const TextStyle(
-                                color: primary,
-                                fontWeight: FontWeight.w800,
+                                  );
+                                },
                               ),
                             ),
-                          ),
-                        ),
-                      );
-                    },
-                  ),
+                    ),
+                    if (myEntry != null) _MyStandingCard(entry: myEntry),
+                  ],
                 );
               },
             ),
@@ -214,6 +217,87 @@ class _LeaderboardScreenState extends State<LeaderboardScreen> {
     2 => const Color(0xFFD7A86E),
     _ => primary,
   };
+}
+
+class _MyStandingCard extends StatelessWidget {
+  final LeaderboardEntry entry;
+
+  const _MyStandingCard({required this.entry});
+
+  @override
+  Widget build(BuildContext context) => Container(
+    width: double.infinity,
+    padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
+    decoration: BoxDecoration(
+      color: Colors.white,
+      border: Border(top: BorderSide(color: Colors.grey.shade300)),
+      boxShadow: [
+        BoxShadow(
+          color: Colors.black.withValues(alpha: .06),
+          blurRadius: 8,
+          offset: const Offset(0, -2),
+        ),
+      ],
+    ),
+    child: Column(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text(
+          'Your standing',
+          style: TextStyle(
+            fontSize: 12,
+            fontWeight: FontWeight.w700,
+            color: Colors.blueGrey,
+            letterSpacing: .3,
+          ),
+        ),
+        const SizedBox(height: 8),
+        Card(
+          color: primary.withValues(alpha: .06),
+          margin: EdgeInsets.zero,
+          child: Padding(
+            padding: const EdgeInsets.symmetric(vertical: 3),
+            child: ListTile(
+              leading: CircleAvatar(
+                backgroundColor: primary,
+                foregroundColor: Colors.white,
+                child: const Icon(Icons.person, size: 20),
+              ),
+              title: Row(
+                children: [
+                  Flexible(
+                    child: Text(
+                      entry.name,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(fontWeight: FontWeight.w800),
+                    ),
+                  ),
+                  const SizedBox(width: 7),
+                  const Chip(
+                    visualDensity: VisualDensity.compact,
+                    label: Text('You'),
+                  ),
+                ],
+              ),
+              subtitle: Text(
+                '${entry.reportCount} reports · '
+                '${entry.verificationCount} verifications',
+              ),
+              trailing: Text(
+                '${entry.points}\npoints',
+                textAlign: TextAlign.right,
+                style: const TextStyle(
+                  color: primary,
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+            ),
+          ),
+        ),
+      ],
+    ),
+  );
 }
 
 class _LeaderboardMessage extends StatelessWidget {
