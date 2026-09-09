@@ -109,7 +109,24 @@ class _LeaderboardScreenState extends State<LeaderboardScreen> {
                     onRetry: _refresh,
                   );
                 }
-                final entries = snapshot.data ?? [];
+                final rawEntries = snapshot.data ?? [];
+                final withPoints = rawEntries
+                    .where((entry) => entry.points >= 1)
+                    .toList();
+
+                LeaderboardEntry? myEntry;
+                for (final entry in rawEntries) {
+                  if (entry.email == currentEmail) {
+                    myEntry = entry;
+                    break;
+                  }
+                }
+
+                final entries = [
+                  ...withPoints.where((entry) => entry.email != currentEmail),
+                  if (myEntry != null) myEntry,
+                ];
+
                 if (entries.isEmpty) {
                   return _LeaderboardMessage(
                     icon: Icons.leaderboard_outlined,
