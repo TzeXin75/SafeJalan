@@ -12,6 +12,7 @@ import 'package:path_provider/path_provider.dart';
 import 'package:permission_handler/permission_handler.dart' as handler;
 import 'package:provider/provider.dart';
 import 'package:safejalan_native/models/report.dart';
+import 'package:safejalan_native/models/report_categories.dart';
 import 'package:safejalan_native/providers/app_provider.dart';
 import 'package:safejalan_native/widgets/common.dart';
 
@@ -138,22 +139,56 @@ class _ReportFormScreenState extends State<ReportFormScreen> {
         'rubble',
       ],
       'Traffic Signals': ['traffic light', 'signal', 'stoplight'],
-      'Infrastructure': [
-        'bridge',
+      'Road Markings': ['road marking', 'lane', 'crosswalk', 'paint'],
+      'Flooding': ['flood', 'water', 'puddle', 'rain'],
+      'Drainage Issue': [
+        'drain',
+        'drainage',
+        'ditch',
+        'culvert',
+        'manhole',
+        'sewer',
+      ],
+      'Road Obstruction': [
+        'obstruction',
+        'debris',
+        'rubble',
+        'object',
+        'block',
+        'barrier',
+        'cone',
+      ],
+      'Fallen Tree': ['tree', 'branch', 'fallen tree', 'wood'],
+      'Street Lighting': [
         'street light',
         'streetlight',
+        'lamp post',
+        'lamp',
+        'light',
+      ],
+      'Road Signage': ['sign', 'signage', 'road sign', 'traffic sign'],
+      'Guardrail / Barrier': [
         'guard rail',
         'guardrail',
         'barrier',
-        'utility pole',
-        'lamp post',
-        'sidewalk',
+        'railing',
+        'fence',
+      ],
+      'Bridge / Tunnel Damage': [
+        'bridge',
         'tunnel',
         'retaining wall',
-        'infrastructure',
+        'overpass',
+        'underpass',
       ],
-      'Flooding': ['flood', 'water', 'puddle', 'rain'],
-      'Road Markings': ['road marking', 'lane', 'crosswalk', 'paint'],
+      'Pedestrian Facilities': [
+        'sidewalk',
+        'walkway',
+        'footpath',
+        'crosswalk',
+        'pedestrian',
+      ],
+      'Road Spill': ['spill', 'oil', 'fuel', 'mud', 'sand', 'gravel'],
     };
     for (final label in labels) {
       final text = label.label.toLowerCase();
@@ -600,19 +635,9 @@ class _ReportFormScreenState extends State<ReportFormScreen> {
                   key: ValueKey(_category),
                   initialValue: _category,
                   decoration: safeInput('Category'),
-                  items:
-                      [
-                            'Pothole',
-                            'Road Damage',
-                            'Traffic Signals',
-                            'Infrastructure',
-                            'Flooding',
-                            'Road Markings',
-                          ]
-                          .map(
-                            (v) => DropdownMenuItem(value: v, child: Text(v)),
-                          )
-                          .toList(),
+                  items: reportCategories
+                      .map((v) => DropdownMenuItem(value: v, child: Text(v)))
+                      .toList(),
                   onChanged: (v) => setState(() => _category = v!),
                 ),
                 const SizedBox(height: 12),

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:safejalan_native/models/report.dart';
+import 'package:safejalan_native/models/report_categories.dart';
 import 'package:safejalan_native/providers/app_provider.dart';
 import 'package:safejalan_native/widgets/common.dart';
 import 'package:safejalan_native/widgets/stored_image.dart';
@@ -286,20 +287,12 @@ class _ReportEditDialogState extends State<_ReportEditDialog> {
             DropdownButtonFormField<String>(
               initialValue: _category,
               decoration: safeInput('Category'),
-              items:
-                  const [
-                        'Pothole',
-                        'Road Damage',
-                        'Traffic Signals',
-                        'Infrastructure',
-                        'Flooding',
-                        'Road Markings',
-                      ]
-                      .map(
-                        (value) =>
-                            DropdownMenuItem(value: value, child: Text(value)),
-                      )
-                      .toList(),
+              items: reportCategoryOptions(_category)
+                  .map(
+                    (value) =>
+                        DropdownMenuItem(value: value, child: Text(value)),
+                  )
+                  .toList(),
               onChanged: (value) => setState(() => _category = value!),
             ),
             const SizedBox(height: 10),
