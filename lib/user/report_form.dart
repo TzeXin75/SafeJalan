@@ -132,77 +132,9 @@ class _ReportFormScreenState extends State<ReportFormScreen> {
   }
 
   (String, double)? _categoryFromLabels(List<ImageLabel> labels) {
-    const mappings = <String, List<String>>{
-      'Pothole': ['pothole', 'hole', 'crater'],
-      'Road Damage': [
-        'road',
-        'asphalt',
-        'pavement',
-        'crack',
-        'construction',
-        'rubble',
-      ],
-      'Traffic Signals': ['traffic light', 'signal', 'stoplight'],
-      'Road Markings': ['road marking', 'lane', 'crosswalk', 'paint'],
-      'Flooding': ['flood', 'water', 'puddle', 'rain'],
-      'Drainage Issue': [
-        'drain',
-        'drainage',
-        'ditch',
-        'culvert',
-        'manhole',
-        'sewer',
-      ],
-      'Road Obstruction': [
-        'obstruction',
-        'debris',
-        'rubble',
-        'object',
-        'block',
-        'barrier',
-        'cone',
-      ],
-      'Fallen Tree': ['tree', 'branch', 'fallen tree', 'wood'],
-      'Street Lighting': [
-        'street light',
-        'streetlight',
-        'lamp post',
-        'lamp',
-        'light',
-      ],
-      'Road Signage': ['sign', 'signage', 'road sign', 'traffic sign'],
-      'Guardrail / Barrier': [
-        'guard rail',
-        'guardrail',
-        'barrier',
-        'railing',
-        'fence',
-      ],
-      'Bridge / Tunnel Damage': [
-        'bridge',
-        'tunnel',
-        'retaining wall',
-        'overpass',
-        'underpass',
-      ],
-      'Pedestrian Facilities': [
-        'sidewalk',
-        'walkway',
-        'footpath',
-        'crosswalk',
-        'pedestrian',
-      ],
-      'Road Spill': ['spill', 'oil', 'fuel', 'mud', 'sand', 'gravel'],
-    };
-    for (final label in labels) {
-      final text = label.label.toLowerCase();
-      for (final entry in mappings.entries) {
-        if (entry.value.any(text.contains)) {
-          return (entry.key, label.confidence);
-        }
-      }
-    }
-    return null;
+    return suggestReportCategory(
+      labels.map((label) => (text: label.label, confidence: label.confidence)),
+    );
   }
 
   void _cancelImageAnalysis() {
