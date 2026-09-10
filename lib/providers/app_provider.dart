@@ -1219,6 +1219,7 @@ class AppProvider extends ChangeNotifier {
     }
 
     final reportCounts = <String, int>{};
+    final connectivityCounts = <String, int>{};
     final verificationCounts = <String, int>{};
     for (final report in reports) {
       final email = report.reporterEmail.trim().toLowerCase();
@@ -1226,6 +1227,13 @@ class AppProvider extends ChangeNotifier {
       reportCounts[email] = (reportCounts[email] ?? 0) + 1;
       verificationCounts[email] =
           (verificationCounts[email] ?? 0) + report.votes;
+      names.putIfAbsent(email, () => email.split('@').first);
+    }
+
+    for (final report in connectivityReports.where((item) => !item.isDeleted)) {
+      final email = report.reporterEmail.trim().toLowerCase();
+      if (email.isEmpty || adminEmails.contains(email)) continue;
+      connectivityCounts[email] = (connectivityCounts[email] ?? 0) + 1;
       names.putIfAbsent(email, () => email.split('@').first);
     }
 
@@ -1238,6 +1246,7 @@ class AppProvider extends ChangeNotifier {
             : profile.value,
         email: profile.key,
         reportCount: reportCounts[profile.key] ?? 0,
+        connectivityCount: connectivityCounts[profile.key] ?? 0,
         verificationCount: verificationCounts[profile.key] ?? 0,
       ),
     )
@@ -1253,9 +1262,22 @@ class AppProvider extends ChangeNotifier {
     return entries;
   }
 
-  int get points =>
-      myReports.length * 80 +
-          myReports.fold(0, (sum, item) => sum + item.votes * 5);
+  int get points {
+    final verificationPoints = myReports.fold<int>(
+      0,
+          (sum, report) => sum + report.votes * 5,
+    );
+    final connectivityCount = connectivityReports
+        .where(
+          (report) =>
+      !report.isDeleted &&
+          report.reporterEmail.toLowerCase() == email.toLowerCase(),
+    )
+        .length;
+    return myReports.length * 80 +
+        verificationPoints +
+        connectivityCount * 40;
+  }
 
   @override
   void dispose() {

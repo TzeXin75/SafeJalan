@@ -36,6 +36,7 @@ class _LeaderboardScreenState extends State<LeaderboardScreen> {
   Future<void> _refresh() async {
     final app = context.read<AppProvider>();
     await app.syncReports();
+    await app.syncConnectivityReports();
     if (!mounted) return;
     final refreshed = app.loadLeaderboard();
     setState(() => _entries = refreshed);
@@ -46,11 +47,22 @@ class _LeaderboardScreenState extends State<LeaderboardScreen> {
     app.leaderboardRevision,
     Object.hashAll(
       app.reports.map(
-        (report) => Object.hash(
+            (report) => Object.hash(
           report.id,
           report.remoteId,
           report.reporterEmail,
           report.votes,
+          report.updatedAt,
+          report.isDeleted,
+        ),
+      ),
+    ),
+    Object.hashAll(
+      app.connectivityReports.map(
+            (report) => Object.hash(
+          report.id,
+          report.remoteId,
+          report.reporterEmail,
           report.updatedAt,
           report.isDeleted,
         ),
@@ -107,7 +119,7 @@ class _LeaderboardScreenState extends State<LeaderboardScreen> {
                     icon: Icons.cloud_off_rounded,
                     title: 'Unable to load ranking',
                     message:
-                        'Pull down or tap retry when the connection returns.',
+                    'Pull down or tap retry when the connection returns.',
                     onRetry: _refresh,
                   );
                 }
@@ -126,7 +138,7 @@ class _LeaderboardScreenState extends State<LeaderboardScreen> {
                 }
 
                 final currentRankIndex = rankedEntries.indexWhere(
-                  (entry) => entry.email == currentEmail,
+                      (entry) => entry.email == currentEmail,
                 );
                 final currentRank = currentRankIndex < 0
                     ? null
@@ -148,83 +160,84 @@ class _LeaderboardScreenState extends State<LeaderboardScreen> {
                     Expanded(
                       child: topEntries.isEmpty
                           ? _LeaderboardMessage(
-                              icon: Icons.leaderboard_outlined,
-                              title: 'No ranked reporters yet',
-                              message:
-                                  'Submit a report or receive a verification to enter the leaderboard.',
-                              onRetry: _refresh,
-                            )
+                        icon: Icons.leaderboard_outlined,
+                        title: 'No ranked reporters yet',
+                        message:
+                        'Submit a road or connectivity report to enter the leaderboard.',
+                        onRetry: _refresh,
+                      )
                           : RefreshIndicator(
-                              onRefresh: _refresh,
-                              child: ListView.separated(
-                                physics: const AlwaysScrollableScrollPhysics(),
-                                padding: const EdgeInsets.all(16),
-                                itemCount: topEntries.length,
-                                separatorBuilder: (_, _) =>
-                                    const SizedBox(height: 9),
-                                itemBuilder: (context, index) {
-                                  final entry = topEntries[index];
-                                  final isCurrent = entry.email == currentEmail;
-                                  return Card(
-                                    color: isCurrent
-                                        ? primary.withValues(alpha: .07)
+                        onRefresh: _refresh,
+                        child: ListView.separated(
+                          physics: const AlwaysScrollableScrollPhysics(),
+                          padding: const EdgeInsets.all(16),
+                          itemCount: topEntries.length,
+                          separatorBuilder: (_, _) =>
+                          const SizedBox(height: 9),
+                          itemBuilder: (context, index) {
+                            final entry = topEntries[index];
+                            final isCurrent = entry.email == currentEmail;
+                            return Card(
+                              color: isCurrent
+                                  ? primary.withValues(alpha: .07)
+                                  : Colors.white,
+                              child: Padding(
+                                padding: const EdgeInsets.symmetric(
+                                  vertical: 3,
+                                ),
+                                child: ListTile(
+                                  leading: CircleAvatar(
+                                    backgroundColor: _rankColor(index),
+                                    foregroundColor: index < 3
+                                        ? navy
                                         : Colors.white,
-                                    child: Padding(
-                                      padding: const EdgeInsets.symmetric(
-                                        vertical: 3,
+                                    child: Text(
+                                      '${index + 1}',
+                                      style: const TextStyle(
+                                        fontWeight: FontWeight.w900,
                                       ),
-                                      child: ListTile(
-                                        leading: CircleAvatar(
-                                          backgroundColor: _rankColor(index),
-                                          foregroundColor: index < 3
-                                              ? navy
-                                              : Colors.white,
-                                          child: Text(
-                                            '${index + 1}',
-                                            style: const TextStyle(
-                                              fontWeight: FontWeight.w900,
-                                            ),
-                                          ),
-                                        ),
-                                        title: Row(
-                                          children: [
-                                            Flexible(
-                                              child: Text(
-                                                entry.name,
-                                                overflow: TextOverflow.ellipsis,
-                                                style: const TextStyle(
-                                                  fontWeight: FontWeight.w800,
-                                                ),
-                                              ),
-                                            ),
-                                            if (isCurrent) ...[
-                                              const SizedBox(width: 7),
-                                              const Chip(
-                                                visualDensity:
-                                                    VisualDensity.compact,
-                                                label: Text('You'),
-                                              ),
-                                            ],
-                                          ],
-                                        ),
-                                        subtitle: Text(
-                                          '${entry.reportCount} reports · '
-                                          '${entry.verificationCount} verifications',
-                                        ),
-                                        trailing: Text(
-                                          '${entry.points}\npoints',
-                                          textAlign: TextAlign.right,
+                                    ),
+                                  ),
+                                  title: Row(
+                                    children: [
+                                      Flexible(
+                                        child: Text(
+                                          entry.name,
+                                          overflow: TextOverflow.ellipsis,
                                           style: const TextStyle(
-                                            color: primary,
                                             fontWeight: FontWeight.w800,
                                           ),
                                         ),
                                       ),
+                                      if (isCurrent) ...[
+                                        const SizedBox(width: 7),
+                                        const Chip(
+                                          visualDensity:
+                                          VisualDensity.compact,
+                                          label: Text('You'),
+                                        ),
+                                      ],
+                                    ],
+                                  ),
+                                  subtitle: Text(
+                                    '${entry.reportCount} road reports · '
+                                        '${entry.connectivityCount} connectivity · '
+                                        '${entry.verificationCount} verifications',
+                                  ),
+                                  trailing: Text(
+                                    '${entry.points}\npoints',
+                                    textAlign: TextAlign.right,
+                                    style: const TextStyle(
+                                      color: primary,
+                                      fontWeight: FontWeight.w800,
                                     ),
-                                  );
-                                },
+                                  ),
+                                ),
                               ),
-                            ),
+                            );
+                          },
+                        ),
+                      ),
                     ),
                     if (myEntry != null && !currentIsInTopTen)
                       _MyStandingCard(entry: myEntry, rank: currentRank),
@@ -309,8 +322,9 @@ class _MyStandingCard extends StatelessWidget {
                 ],
               ),
               subtitle: Text(
-                '${entry.reportCount} reports · '
-                '${entry.verificationCount} verifications',
+                '${entry.reportCount} road reports · '
+                    '${entry.connectivityCount} connectivity · '
+                    '${entry.verificationCount} verifications',
               ),
               trailing: Text(
                 '${entry.points}\npoints',
