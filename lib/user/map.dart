@@ -83,8 +83,13 @@ class _MapScreenState extends State<MapScreen> {
       !report.isDeleted &&
           const {'pending', 'reviewed'}.contains(
             report.status.toLowerCase(),
-          ) &&
-          report.latitude.abs() <= 90 &&
+          ),
+    )
+        .toList();
+    final mappableConnectivityReports = connectivityReports
+        .where(
+          (report) =>
+      report.latitude.abs() <= 90 &&
           report.longitude.abs() <= 180 &&
           (report.latitude != 0 || report.longitude != 0),
     )
@@ -202,7 +207,7 @@ class _MapScreenState extends State<MapScreen> {
                             ),
                           ),
                         if (_showConnectivity)
-                          ...connectivityReports.map(
+                          ...mappableConnectivityReports.map(
                                 (report) => Marker(
                               point: LatLng(
                                 report.latitude,
