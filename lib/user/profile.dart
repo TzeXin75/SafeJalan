@@ -17,8 +17,8 @@ class ProfileScreen extends StatelessWidget {
     final connectivityReports = app.connectivityReports
         .where(
           (report) =>
-      report.reporterEmail.toLowerCase() == app.email.toLowerCase(),
-    )
+              report.reporterEmail.toLowerCase() == app.email.toLowerCase(),
+        )
         .toList();
     const badges = [
       _BadgeInfo(Icons.flag_rounded, 'First Step', 1, Color(0xFF4361EE)),
@@ -43,7 +43,7 @@ class ProfileScreen extends StatelessWidget {
       ),
     ];
     final lockedBadges = badges.where(
-          (badge) => reportCount < badge.requiredReports,
+      (badge) => reportCount < badge.requiredReports,
     );
     final nextBadge = lockedBadges.isEmpty ? null : lockedBadges.first;
     final badgeProgress = nextBadge == null
@@ -162,8 +162,8 @@ class ProfileScreen extends StatelessWidget {
                       CircleAvatar(
                         radius: 20,
                         backgroundColor:
-                        (nextBadge?.color ?? const Color(0xFF12B886))
-                            .withValues(alpha: .12),
+                            (nextBadge?.color ?? const Color(0xFF12B886))
+                                .withValues(alpha: .12),
                         child: Icon(
                           nextBadge?.icon ?? Icons.verified_rounded,
                           color: nextBadge?.color ?? const Color(0xFF12B886),
@@ -228,31 +228,42 @@ class ProfileScreen extends StatelessWidget {
                 children: badges
                     .map(
                       (badge) => SizedBox(
-                    width: badgeWidth,
-                    child: _Badge(
-                      badge: badge,
-                      earned: reportCount >= badge.requiredReports,
-                    ),
-                  ),
-                )
+                        width: badgeWidth,
+                        child: _Badge(
+                          badge: badge,
+                          earned: reportCount >= badge.requiredReports,
+                        ),
+                      ),
+                    )
                     .toList(),
               );
             },
           ),
           const SizedBox(height: 18),
-          const PageTitle('Road Report History', 'Your latest road submissions'),
+          const PageTitle(
+            'Road Report History',
+            'Your latest road submissions',
+          ),
           const SizedBox(height: 8),
-          ...app.myProfileReports.map(
-                (r) => ReportTile(
-              report: r,
-              onTap: () => Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (_) => ReportDetailScreen(report: r),
+          if (app.myProfileReports.isEmpty)
+            const Card(
+              child: Padding(
+                padding: EdgeInsets.all(18),
+                child: Text('No road reports yet.'),
+              ),
+            )
+          else
+            ...app.myProfileReports.map(
+              (report) => ReportTile(
+                report: report,
+                onTap: () => Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => ReportDetailScreen(report: report),
+                  ),
                 ),
               ),
             ),
-          ),
           const SizedBox(height: 18),
           const PageTitle(
             'Connectivity History',
@@ -268,14 +279,13 @@ class ProfileScreen extends StatelessWidget {
             )
           else
             ...connectivityReports.map(
-                  (report) => Card(
+              (report) => Card(
                 margin: const EdgeInsets.only(bottom: 10),
                 child: ListTile(
                   onTap: () => Navigator.push(
                     context,
                     MaterialPageRoute(
-                      builder: (_) =>
-                          ConnectivityDetailScreen(report: report),
+                      builder: (_) => ConnectivityDetailScreen(report: report),
                     ),
                   ),
                   leading: const CircleAvatar(
@@ -303,7 +313,7 @@ class ProfileScreen extends StatelessWidget {
               Navigator.pushAndRemoveUntil(
                 context,
                 MaterialPageRoute(builder: (_) => const EntryScreen()),
-                    (_) => false,
+                (_) => false,
               );
             },
             icon: const Icon(Icons.logout),
