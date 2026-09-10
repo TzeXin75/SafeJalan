@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 import 'package:safejalan/providers/app_provider.dart';
 import 'package:safejalan/services/database_service.dart';
 import 'package:safejalan/widgets/common.dart';
+import 'package:safejalan/admin/connectivity_detail.dart';
 import 'package:safejalan/admin/report_detail.dart';
 
 class DashboardScreen extends StatelessWidget {
@@ -21,6 +22,9 @@ class DashboardScreen extends StatelessWidget {
     final connectivityReports = app.connectivityReports
         .where((report) => !report.isDeleted)
         .toList();
+    final connectivityResolved = connectivityReports
+        .where((report) => report.status.toLowerCase() == 'resolved')
+        .length;
     return SafeArea(
       child: ListView(
         padding: const EdgeInsets.all(16),
@@ -125,6 +129,93 @@ class DashboardScreen extends StatelessWidget {
               ),
             ),
           ),
+          const SizedBox(height: 20),
+          const PageTitle(
+            'Connectivity completion',
+            'Resolution progress',
+          ),
+          const SizedBox(height: 8),
+          Card(
+            child: Padding(
+              padding: const EdgeInsets.all(18),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    connectivityReports.isEmpty
+                        ? '0%'
+                        : '${(connectivityResolved / connectivityReports.length * 100).round()}%',
+                    style: const TextStyle(
+                      fontSize: 28,
+                      fontWeight: FontWeight.w800,
+                      color: Color(0xFF8B5CF6),
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  LinearProgressIndicator(
+                    value: connectivityReports.isEmpty
+                        ? 0
+                        : connectivityResolved / connectivityReports.length,
+                    minHeight: 10,
+                    color: const Color(0xFF8B5CF6),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  const SizedBox(height: 8),
+                  const Text(
+                    'Connectivity issues resolved by administrators',
+                    style: TextStyle(color: mutedText),
+                  ),
+                ],
+              ),
+            ),
+          ),
+          const SizedBox(height: 16),
+          const PageTitle(
+            'Recent Connectivity',
+            'Latest signal and Wi-Fi submissions',
+          ),
+          const SizedBox(height: 8),
+          if (connectivityReports.isEmpty)
+            const Card(
+              child: Padding(
+                padding: EdgeInsets.all(18),
+                child: Text('No connectivity reports yet.'),
+              ),
+            )
+          else
+            ...connectivityReports.take(3).map(
+                  (report) => Card(
+                margin: const EdgeInsets.only(bottom: 10),
+                child: ListTile(
+                  onTap: () => Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) =>
+                          AdminConnectivityDetailScreen(report: report),
+                    ),
+                  ),
+                  leading: CircleAvatar(
+                    backgroundColor: const Color(
+                      0xFF8B5CF6,
+                    ).withValues(alpha: .12),
+                    child: const Icon(
+                      Icons.wifi_off_rounded,
+                      color: Color(0xFF8B5CF6),
+                    ),
+                  ),
+                  title: Text(report.area),
+                  subtitle: Text('${report.carrier} · ${report.issueType}'),
+                  trailing: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      LabelBadge(report.status, statusColor(report.status)),
+                      const SizedBox(width: 4),
+                      const Icon(Icons.chevron_right_rounded, size: 18),
+                    ],
+                  ),
+                ),
+              ),
+            ),
         ],
       ),
     );
