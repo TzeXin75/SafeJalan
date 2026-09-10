@@ -16,139 +16,35 @@ class AdminConnectivityDetailScreen extends StatefulWidget {
 
 class _AdminConnectivityDetailScreenState
     extends State<AdminConnectivityDetailScreen> {
-  late String _status;
   bool _saving = false;
-
-  @override
-  void initState() {
-    super.initState();
-    _status = widget.report.status;
-  }
 
   @override
   Widget build(BuildContext context) {
     final report = context
         .watch<AppProvider>()
         .latestConnectivityVersionOf(widget.report);
+    final currentStatus = report.status.toLowerCase();
+
     return Scaffold(
       appBar: AppBar(title: const Text('Manage Connectivity')),
       body: ListView(
         padding: const EdgeInsets.all(16),
         children: [
-          Card(
-            child: Padding(
-              padding: const EdgeInsets.all(16),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    children: [
-                      const CircleAvatar(
-                        radius: 25,
-                        backgroundColor: Color(0x148B5CF6),
-                        child: Icon(
-                          Icons.wifi_off_rounded,
-                          color: Color(0xFF8B5CF6),
-                        ),
-                      ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              report.issueType,
-                              style: const TextStyle(
-                                color: navy,
-                                fontSize: 20,
-                                fontWeight: FontWeight.w800,
-                              ),
-                            ),
-                            Text(
-                              report.carrier,
-                              style: const TextStyle(color: mutedText),
-                            ),
-                          ],
-                        ),
-                      ),
-                      LabelBadge(report.status, statusColor(report.status)),
-                    ],
-                  ),
-                  const SizedBox(height: 18),
-                  _DetailRow(Icons.location_on_outlined, 'Area', report.area),
-                  _DetailRow(Icons.notes_outlined, 'Notes', report.notes),
-                  _DetailRow(
-                    Icons.person_outline_rounded,
-                    'Reporter',
-                    report.reporterEmail,
-                  ),
-                  _DetailRow(
-                    Icons.schedule_rounded,
-                    'Submitted',
-                    _formatDateTime(report.createdAt),
-                  ),
-                  _DetailRow(
-                    Icons.pin_drop_outlined,
-                    'Coordinates',
-                    '${report.latitude.toStringAsFixed(5)}, '
-                        '${report.longitude.toStringAsFixed(5)}',
-                  ),
-                ],
-              ),
-            ),
-          ),
+          _ConnectivityInformationCard(report: report),
           const SizedBox(height: 12),
-          Card(
-            child: Padding(
-              padding: const EdgeInsets.all(16),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const Text(
-                    'Update status',
-                    style: TextStyle(
-                      color: navy,
-                      fontSize: 20,
-                      fontWeight: FontWeight.w800,
-                    ),
-                  ),
-                  const SizedBox(height: 14),
-                  DropdownButtonFormField<String>(
-                    initialValue: _status,
-                    decoration: safeInput('Current status'),
-                    items: const [
-                      DropdownMenuItem(
-                        value: 'Pending',
-                        child: Text('Pending'),
-                      ),
-                      DropdownMenuItem(
-                        value: 'Reviewed',
-                        child: Text('Reviewed'),
-                      ),
-                      DropdownMenuItem(
-                        value: 'Resolved',
-                        child: Text('Resolved'),
-                      ),
-                    ],
-                    onChanged: _saving
-                        ? null
-                        : (value) => setState(() => _status = value!),
-                  ),
-                  const SizedBox(height: 14),
-                  SizedBox(
-                    width: double.infinity,
-                    child: FilledButton.icon(
-                      onPressed: _saving || _status == report.status
-                          ? null
-                          : () => _save(report),
-                      icon: const Icon(Icons.save_outlined),
-                      label: Text(_saving ? 'Saving...' : 'Save status'),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
+          if (currentStatus == 'pending')
+            _ReviewCard(
+              saving: _saving,
+              onReject: () => _setStatus(report, 'Rejected'),
+              onReview: () => _setStatus(report, 'Reviewed'),
+            )
+          else if (currentStatus == 'reviewed')
+            _ManageCard(
+              saving: _saving,
+              onResolve: () => _setStatus(report, 'Resolved'),
+            )
+          else
+            _ClosedStatusCard(report: report),
           const SizedBox(height: 12),
           OutlinedButton.icon(
             style: OutlinedButton.styleFrom(foregroundColor: Colors.red),
@@ -161,19 +57,22 @@ class _AdminConnectivityDetailScreenState
     );
   }
 
-  Future<void> _save(ConnectivityReport report) async {
+  Future<void> _setStatus(
+      ConnectivityReport report,
+      String status,
+      ) async {
     setState(() => _saving = true);
     final synced = await context
         .read<AppProvider>()
-        .updateConnectivityStatus(report, _status);
+        .updateConnectivityStatus(report, status);
     if (!mounted) return;
     setState(() => _saving = false);
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text(
           synced
-              ? 'Status updated and synced.'
-              : 'Status saved locally and will sync when online.',
+              ? 'Status updated to $status and synced.'
+              : 'Status updated to $status and will sync when online.',
         ),
       ),
     );
@@ -203,6 +102,209 @@ class _AdminConnectivityDetailScreenState
     if (confirmed != true || !mounted) return;
     await context.read<AppProvider>().deleteConnectivityReport(report);
     if (mounted) Navigator.pop(context);
+  }
+}
+
+class _ConnectivityInformationCard extends StatelessWidget {
+  const _ConnectivityInformationCard({required this.report});
+
+  final ConnectivityReport report;
+
+  @override
+  Widget build(BuildContext context) => Card(
+    child: Padding(
+      padding: const EdgeInsets.all(16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              const CircleAvatar(
+                radius: 25,
+                backgroundColor: Color(0x148B5CF6),
+                child: Icon(
+                  Icons.wifi_off_rounded,
+                  color: Color(0xFF8B5CF6),
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      report.issueType,
+                      style: const TextStyle(
+                        color: navy,
+                        fontSize: 20,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                    Text(
+                      report.carrier,
+                      style: const TextStyle(color: mutedText),
+                    ),
+                  ],
+                ),
+              ),
+              LabelBadge(report.status, statusColor(report.status)),
+            ],
+          ),
+          const SizedBox(height: 18),
+          _DetailRow(Icons.location_on_outlined, 'Area', report.area),
+          _DetailRow(Icons.notes_outlined, 'Notes', report.notes),
+          _DetailRow(
+            Icons.person_outline_rounded,
+            'Reporter',
+            report.reporterEmail,
+          ),
+          _DetailRow(
+            Icons.schedule_rounded,
+            'Submitted',
+            _formatDateTime(report.createdAt),
+          ),
+          _DetailRow(
+            Icons.pin_drop_outlined,
+            'Coordinates',
+            '${report.latitude.toStringAsFixed(5)}, '
+                '${report.longitude.toStringAsFixed(5)}',
+          ),
+        ],
+      ),
+    ),
+  );
+}
+
+class _ReviewCard extends StatelessWidget {
+  const _ReviewCard({
+    required this.saving,
+    required this.onReject,
+    required this.onReview,
+  });
+
+  final bool saving;
+  final VoidCallback onReject;
+  final VoidCallback onReview;
+
+  @override
+  Widget build(BuildContext context) => Card(
+    child: Padding(
+      padding: const EdgeInsets.all(16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text(
+            'Review submission',
+            style: TextStyle(
+              color: navy,
+              fontSize: 20,
+              fontWeight: FontWeight.w800,
+            ),
+          ),
+          const SizedBox(height: 6),
+          const Text(
+            'Check the submitted area and details before continuing.',
+            style: TextStyle(color: mutedText),
+          ),
+          const SizedBox(height: 14),
+          Row(
+            children: [
+              Expanded(
+                child: OutlinedButton.icon(
+                  style: OutlinedButton.styleFrom(foregroundColor: Colors.red),
+                  onPressed: saving ? null : onReject,
+                  icon: const Icon(Icons.close_rounded),
+                  label: const Text('Reject'),
+                ),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: FilledButton.icon(
+                  onPressed: saving ? null : onReview,
+                  icon: const Icon(Icons.check_rounded),
+                  label: Text(saving ? 'Saving...' : 'Review'),
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    ),
+  );
+}
+
+class _ManageCard extends StatelessWidget {
+  const _ManageCard({required this.saving, required this.onResolve});
+
+  final bool saving;
+  final VoidCallback onResolve;
+
+  @override
+  Widget build(BuildContext context) => Card(
+    child: Padding(
+      padding: const EdgeInsets.all(16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text(
+            'Manage Connectivity',
+            style: TextStyle(
+              color: navy,
+              fontSize: 20,
+              fontWeight: FontWeight.w800,
+            ),
+          ),
+          const SizedBox(height: 6),
+          const Text(
+            'The report has been reviewed. Mark it as resolved when the connectivity issue has been handled.',
+            style: TextStyle(color: mutedText),
+          ),
+          const SizedBox(height: 14),
+          SizedBox(
+            width: double.infinity,
+            child: FilledButton.icon(
+              onPressed: saving ? null : onResolve,
+              icon: const Icon(Icons.check_circle_outline_rounded),
+              label: Text(saving ? 'Saving...' : 'Mark as Resolved'),
+            ),
+          ),
+        ],
+      ),
+    ),
+  );
+}
+
+class _ClosedStatusCard extends StatelessWidget {
+  const _ClosedStatusCard({required this.report});
+
+  final ConnectivityReport report;
+
+  @override
+  Widget build(BuildContext context) {
+    final resolved = report.status.toLowerCase() == 'resolved';
+    final color = statusColor(report.status);
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Row(
+          children: [
+            Icon(
+              resolved ? Icons.check_circle_rounded : Icons.cancel_rounded,
+              color: color,
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Text(
+                resolved
+                    ? 'This connectivity issue has been resolved.'
+                    : 'This connectivity report has been rejected.',
+                style: TextStyle(color: color, fontWeight: FontWeight.w700),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 }
 

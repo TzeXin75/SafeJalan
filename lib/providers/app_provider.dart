@@ -962,6 +962,11 @@ class AppProvider extends ChangeNotifier {
       'Your ${updated.issueType} report at ${updated.area} was marked Resolved.',
       'connectivity_resolved',
       ),
+      'rejected' => (
+      'Connectivity report rejected',
+      'Your ${updated.issueType} report at ${updated.area} was rejected by the admin.',
+      'connectivity_rejected',
+      ),
       'pending' => (
       'Connectivity report pending',
       'Your ${updated.issueType} report at ${updated.area} was returned to Pending.',
