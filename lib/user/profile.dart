@@ -4,6 +4,7 @@ import 'package:safejalan/providers/app_provider.dart';
 import 'package:safejalan/widgets/common.dart';
 import 'package:safejalan/entry.dart';
 import 'package:safejalan/user/report_detail.dart';
+import 'package:safejalan/user/connectivity_detail.dart';
 import 'package:safejalan/user/edit_profile.dart';
 import 'package:safejalan/widgets/stored_image.dart';
 
@@ -13,6 +14,12 @@ class ProfileScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     final app = context.watch<AppProvider>();
     final reportCount = app.myReports.length;
+    final connectivityReports = app.connectivityReports
+        .where(
+          (report) =>
+      report.reporterEmail.toLowerCase() == app.email.toLowerCase(),
+    )
+        .toList();
     const badges = [
       _BadgeInfo(Icons.flag_rounded, 'First Step', 1, Color(0xFF4361EE)),
       _BadgeInfo(Icons.explore_rounded, 'Road Scout', 3, Color(0xFF0EA5E9)),
@@ -36,7 +43,7 @@ class ProfileScreen extends StatelessWidget {
       ),
     ];
     final lockedBadges = badges.where(
-      (badge) => reportCount < badge.requiredReports,
+          (badge) => reportCount < badge.requiredReports,
     );
     final nextBadge = lockedBadges.isEmpty ? null : lockedBadges.first;
     final badgeProgress = nextBadge == null
@@ -114,20 +121,32 @@ class ProfileScreen extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 18),
-          Row(
-            children: [
-              Expanded(
-                child: _Metric('Total Points', '${app.points}', primary),
-              ),
-              const SizedBox(width: 10),
-              Expanded(
-                child: _Metric(
-                  'Reports',
-                  '${app.myReports.length}',
-                  Colors.orange,
+          SizedBox(
+            height: 104,
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Expanded(
+                  child: _Metric('Total Points', '${app.points}', primary),
                 ),
-              ),
-            ],
+                const SizedBox(width: 10),
+                Expanded(
+                  child: _Metric(
+                    'Road Reports',
+                    '${app.myReports.length}',
+                    Colors.orange,
+                  ),
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: _Metric(
+                    'Connectivity',
+                    '${connectivityReports.length}',
+                    safeTeal,
+                  ),
+                ),
+              ],
+            ),
           ),
           const SizedBox(height: 18),
           const PageTitle('Badge Progress', 'Your community milestones'),
@@ -143,8 +162,8 @@ class ProfileScreen extends StatelessWidget {
                       CircleAvatar(
                         radius: 20,
                         backgroundColor:
-                            (nextBadge?.color ?? const Color(0xFF12B886))
-                                .withValues(alpha: .12),
+                        (nextBadge?.color ?? const Color(0xFF12B886))
+                            .withValues(alpha: .12),
                         child: Icon(
                           nextBadge?.icon ?? Icons.verified_rounded,
                           color: nextBadge?.color ?? const Color(0xFF12B886),
@@ -209,22 +228,22 @@ class ProfileScreen extends StatelessWidget {
                 children: badges
                     .map(
                       (badge) => SizedBox(
-                        width: badgeWidth,
-                        child: _Badge(
-                          badge: badge,
-                          earned: reportCount >= badge.requiredReports,
-                        ),
-                      ),
-                    )
+                    width: badgeWidth,
+                    child: _Badge(
+                      badge: badge,
+                      earned: reportCount >= badge.requiredReports,
+                    ),
+                  ),
+                )
                     .toList(),
               );
             },
           ),
           const SizedBox(height: 18),
-          const PageTitle('Report History', 'Your latest submissions'),
+          const PageTitle('Road Report History', 'Your latest road submissions'),
           const SizedBox(height: 8),
           ...app.myProfileReports.map(
-            (r) => ReportTile(
+                (r) => ReportTile(
               report: r,
               onTap: () => Navigator.push(
                 context,
@@ -234,6 +253,47 @@ class ProfileScreen extends StatelessWidget {
               ),
             ),
           ),
+          const SizedBox(height: 18),
+          const PageTitle(
+            'Connectivity History',
+            'Your connectivity issue submissions',
+          ),
+          const SizedBox(height: 8),
+          if (connectivityReports.isEmpty)
+            const Card(
+              child: Padding(
+                padding: EdgeInsets.all(18),
+                child: Text('No connectivity reports yet.'),
+              ),
+            )
+          else
+            ...connectivityReports.map(
+                  (report) => Card(
+                margin: const EdgeInsets.only(bottom: 10),
+                child: ListTile(
+                  onTap: () => Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) =>
+                          ConnectivityDetailScreen(report: report),
+                    ),
+                  ),
+                  leading: const CircleAvatar(
+                    child: Icon(Icons.wifi_off_rounded),
+                  ),
+                  title: Text(report.area),
+                  subtitle: Text('${report.carrier} · ${report.issueType}'),
+                  trailing: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      LabelBadge(report.status, statusColor(report.status)),
+                      const SizedBox(width: 4),
+                      const Icon(Icons.chevron_right_rounded, size: 18),
+                    ],
+                  ),
+                ),
+              ),
+            ),
           const SizedBox(height: 6),
           OutlinedButton.icon(
             style: OutlinedButton.styleFrom(foregroundColor: Colors.red),
@@ -243,7 +303,7 @@ class ProfileScreen extends StatelessWidget {
               Navigator.pushAndRemoveUntil(
                 context,
                 MaterialPageRoute(builder: (_) => const EntryScreen()),
-                (_) => false,
+                    (_) => false,
               );
             },
             icon: const Icon(Icons.logout),
@@ -273,7 +333,12 @@ class _Metric extends StatelessWidget {
               fontWeight: FontWeight.w800,
             ),
           ),
-          Text(label, style: const TextStyle(color: mutedText, fontSize: 12)),
+          Text(
+            label,
+            textAlign: TextAlign.center,
+            maxLines: 2,
+            style: const TextStyle(color: mutedText, fontSize: 12),
+          ),
         ],
       ),
     ),

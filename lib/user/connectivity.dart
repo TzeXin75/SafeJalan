@@ -25,6 +25,8 @@ class _ConnectivityScreenState extends State<ConnectivityScreen> {
   String _type = 'Poor Signal';
   bool _saving = false;
   bool _locating = false;
+  bool _checkingArea = false;
+  bool _locationConfirmed = false;
   bool _permissionGranted = false;
   bool _gpsEnabled = false;
   String? _locationMessage;
@@ -92,7 +94,7 @@ class _ConnectivityScreenState extends State<ConnectivityScreen> {
         _locationRun++;
         _locating = false;
         _locationMessage =
-            'GPS detection cancelled. You can enter the area manually.';
+        'GPS detection cancelled. You can enter the area manually.';
       });
       return;
     }
@@ -118,7 +120,7 @@ class _ConnectivityScreenState extends State<ConnectivityScreen> {
           !(await _requestLocationPermission())) {
         if (mounted && locationRun == _locationRun) {
           setState(
-            () => _locationMessage = 'Location permission was not granted.',
+                () => _locationMessage = 'Location permission was not granted.',
           );
         }
         return;
@@ -141,20 +143,23 @@ class _ConnectivityScreenState extends State<ConnectivityScreen> {
 
       await _updateAreaName(_latitude!, _longitude!);
       if (mounted && locationRun == _locationRun) {
-        setState(() => _locationMessage = 'Current location detected.');
+        setState(() {
+          _locationConfirmed = true;
+          _locationMessage = 'Current location detected and confirmed.';
+        });
       }
     } on TimeoutException {
       if (mounted && locationRun == _locationRun) {
         setState(
-          () => _locationMessage =
-              'GPS timed out. Move near an open area and try again.',
+              () => _locationMessage =
+          'GPS timed out. Move near an open area and try again.',
         );
       }
     } catch (_) {
       if (mounted && locationRun == _locationRun) {
         setState(
-          () => _locationMessage =
-              'Unable to detect GPS. Retry or enter the area manually.',
+              () => _locationMessage =
+          'Unable to detect GPS. Retry or enter the area manually.',
         );
       }
     } finally {
@@ -170,33 +175,33 @@ class _ConnectivityScreenState extends State<ConnectivityScreen> {
       if (!mounted) return;
       if (places.isEmpty) {
         _area.text =
-            '${latitude.toStringAsFixed(5)}, ${longitude.toStringAsFixed(5)}';
+        '${latitude.toStringAsFixed(5)}, ${longitude.toStringAsFixed(5)}';
         return;
       }
 
       final place = places.first;
       final parts =
-          <String?>[
-                place.street,
-                place.subLocality,
-                place.locality,
-                place.administrativeArea,
-              ]
-              .whereType<String>()
-              .where((part) => part.trim().isNotEmpty)
-              .toSet()
-              .toList();
+      <String?>[
+        place.street,
+        place.subLocality,
+        place.locality,
+        place.administrativeArea,
+      ]
+          .whereType<String>()
+          .where((part) => part.trim().isNotEmpty)
+          .toSet()
+          .toList();
 
       if (parts.isNotEmpty) {
         _area.text = parts.join(', ');
       } else {
         _area.text =
-            '${latitude.toStringAsFixed(5)}, ${longitude.toStringAsFixed(5)}';
+        '${latitude.toStringAsFixed(5)}, ${longitude.toStringAsFixed(5)}';
       }
     } catch (_) {
       if (!mounted) return;
       _area.text =
-          '${latitude.toStringAsFixed(5)}, ${longitude.toStringAsFixed(5)}';
+      '${latitude.toStringAsFixed(5)}, ${longitude.toStringAsFixed(5)}';
     }
   }
 
@@ -256,7 +261,7 @@ class _ConnectivityScreenState extends State<ConnectivityScreen> {
                   children: [
                     TileLayer(
                       urlTemplate:
-                          'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+                      'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
                       userAgentPackageName: 'com.safejalan.flutter',
                     ),
                     MarkerLayer(
@@ -305,12 +310,137 @@ class _ConnectivityScreenState extends State<ConnectivityScreen> {
     if (!mounted) return;
     setState(() {
       _locating = false;
+      _locationConfirmed = true;
       _locationMessage = 'Map location selected.';
     });
   }
 
+  String _readableAddress(geo.Placemark place) {
+    final parts =
+    <String?>[
+      place.street,
+      place.subLocality,
+      place.locality,
+      place.administrativeArea,
+      place.postalCode,
+      place.country,
+    ]
+        .whereType<String>()
+        .map((part) => part.trim())
+        .where((part) => part.isNotEmpty)
+        .toSet()
+        .toList();
+    return parts.join(', ');
+  }
+
+  Future<bool> _confirmTypedArea() async {
+    final typedArea = _area.text.trim();
+    if (typedArea.isEmpty) {
+      setState(() => _locationMessage = 'Enter an affected area first.');
+      return false;
+    }
+    setState(() {
+      _checkingArea = true;
+      _locationMessage = 'Checking the entered address...';
+    });
+
+    try {
+      final query = typedArea.toLowerCase().contains('malaysia')
+          ? typedArea
+          : '$typedArea, Malaysia';
+      final locations = await geo.locationFromAddress(query);
+      if (!mounted) return false;
+      if (locations.isEmpty) {
+        setState(() {
+          _locationMessage =
+          'Address not found. Enter a more specific place or use the map.';
+        });
+        return false;
+      }
+
+      final location = locations.first;
+      final places = await geo.placemarkFromCoordinates(
+        location.latitude,
+        location.longitude,
+      );
+      if (!mounted) return false;
+      final matchedAddress = places.isEmpty
+          ? typedArea
+          : _readableAddress(places.first);
+      final displayAddress = matchedAddress.isEmpty
+          ? typedArea
+          : matchedAddress;
+
+      final confirmed = await showDialog<bool>(
+        context: context,
+        builder: (context) => AlertDialog(
+          icon: const Icon(Icons.location_on_rounded, color: primary, size: 34),
+          title: const Text('Confirm affected area'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text('We found this address:'),
+              const SizedBox(height: 10),
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: primary.withValues(alpha: .08),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Text(
+                  displayAddress,
+                  style: const TextStyle(fontWeight: FontWeight.w700),
+                ),
+              ),
+              const SizedBox(height: 10),
+              const Text('Is this the correct affected area?'),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context, false),
+              child: const Text('Edit address'),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.pop(context, true),
+              child: const Text('Confirm'),
+            ),
+          ],
+        ),
+      );
+
+      if (confirmed != true || !mounted) {
+        setState(() => _locationMessage = 'Please edit or adjust the area.');
+        return false;
+      }
+
+      setState(() {
+        _area.text = displayAddress;
+        _latitude = location.latitude;
+        _longitude = location.longitude;
+        _locationConfirmed = true;
+        _locationMessage = 'Address confirmed.';
+      });
+      return true;
+    } catch (_) {
+      if (mounted) {
+        setState(() {
+          _locationMessage =
+          'Unable to check this address. Check the internet or use the map.';
+        });
+      }
+      return false;
+    } finally {
+      if (mounted) setState(() => _checkingArea = false);
+    }
+  }
+
   Future<void> _submit() async {
     if (!_key.currentState!.validate() || _saving) return;
+    if (!_locationConfirmed && !await _confirmTypedArea()) return;
+    if (!mounted) return;
     setState(() => _saving = true);
     await context.read<AppProvider>().addConnectivityReport(
       issueType: _type,
@@ -326,6 +456,7 @@ class _ConnectivityScreenState extends State<ConnectivityScreen> {
       _saving = false;
       _latitude = null;
       _longitude = null;
+      _locationConfirmed = false;
       _locationMessage = null;
     });
     ScaffoldMessenger.of(
@@ -339,8 +470,8 @@ class _ConnectivityScreenState extends State<ConnectivityScreen> {
     final items = app.connectivityReports
         .where(
           (report) =>
-              report.reporterEmail.toLowerCase() == app.email.toLowerCase(),
-        )
+      report.reporterEmail.toLowerCase() == app.email.toLowerCase(),
+    )
         .toList();
     return SafeArea(
       child: Column(
@@ -377,23 +508,23 @@ class _ConnectivityScreenState extends State<ConnectivityScreen> {
                     children: ['Poor Signal', 'No Wi-Fi']
                         .map(
                           (value) => Expanded(
-                            child: Padding(
-                              padding: const EdgeInsets.all(4),
-                              child: ChoiceChip(
-                                label: SizedBox(
-                                  width: double.infinity,
-                                  child: Text(
-                                    value,
-                                    textAlign: TextAlign.center,
-                                  ),
-                                ),
-                                selected: _type == value,
-                                onSelected: (_) =>
-                                    setState(() => _type = value),
+                        child: Padding(
+                          padding: const EdgeInsets.all(4),
+                          child: ChoiceChip(
+                            label: SizedBox(
+                              width: double.infinity,
+                              child: Text(
+                                value,
+                                textAlign: TextAlign.center,
                               ),
                             ),
+                            selected: _type == value,
+                            onSelected: (_) =>
+                                setState(() => _type = value),
                           ),
-                        )
+                        ),
+                      ),
+                    )
                         .toList(),
                   ),
                   const SizedBox(height: 12),
@@ -413,13 +544,46 @@ class _ConnectivityScreenState extends State<ConnectivityScreen> {
                     controller: _area,
                     maxLength: 150,
                     textCapitalization: TextCapitalization.words,
-                    decoration: safeInput(
+                    decoration:
+                    safeInput(
                       'Affected area',
                       icon: Icons.location_on_outlined,
+                    ).copyWith(
+                      suffixIcon: IconButton(
+                        tooltip: 'Search and confirm address',
+                        onPressed: _checkingArea
+                            ? null
+                            : () => _confirmTypedArea(),
+                        icon: _checkingArea
+                            ? const Padding(
+                          padding: EdgeInsets.all(13),
+                          child: SizedBox(
+                            width: 18,
+                            height: 18,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                            ),
+                          ),
+                        )
+                            : const Icon(Icons.search_rounded),
+                      ),
                     ),
                     validator: (value) => value == null || value.trim().isEmpty
                         ? 'Enter the affected area'
                         : null,
+                    onChanged: (_) {
+                      if (_locationConfirmed ||
+                          _latitude != null ||
+                          _longitude != null) {
+                        setState(() {
+                          _locationConfirmed = false;
+                          _latitude = null;
+                          _longitude = null;
+                          _locationMessage =
+                          'Address changed. It will be checked before submission.';
+                        });
+                      }
+                    },
                   ),
                   const SizedBox(height: 4),
                   Row(
@@ -457,7 +621,7 @@ class _ConnectivityScreenState extends State<ConnectivityScreen> {
                       padding: const EdgeInsets.only(top: 5),
                       child: Text(
                         '${_latitude!.toStringAsFixed(5)}, '
-                        '${_longitude!.toStringAsFixed(5)}',
+                            '${_longitude!.toStringAsFixed(5)}',
                         textAlign: TextAlign.center,
                         style: const TextStyle(color: mutedText, fontSize: 11),
                       ),
@@ -474,8 +638,14 @@ class _ConnectivityScreenState extends State<ConnectivityScreen> {
                   ),
                   const SizedBox(height: 16),
                   FilledButton(
-                    onPressed: _saving ? null : _submit,
-                    child: Text(_saving ? 'Saving...' : 'Report Gap'),
+                    onPressed: _saving || _checkingArea ? null : _submit,
+                    child: Text(
+                      _checkingArea
+                          ? 'Checking address...'
+                          : _saving
+                          ? 'Saving...'
+                          : 'Report Gap',
+                    ),
                   ),
                   const SizedBox(height: 22),
                   const Text(
@@ -491,7 +661,7 @@ class _ConnectivityScreenState extends State<ConnectivityScreen> {
                       ),
                     ),
                   ...items.map(
-                    (item) => Card(
+                        (item) => Card(
                       margin: const EdgeInsets.only(bottom: 10),
                       child: ListTile(
                         onTap: () => Navigator.push(

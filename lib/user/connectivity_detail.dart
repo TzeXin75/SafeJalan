@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:geocoding/geocoding.dart' as geo;
 import 'package:provider/provider.dart';
 import 'package:safejalan/models/connectivity_report.dart';
 import 'package:safejalan/providers/app_provider.dart';
@@ -53,6 +54,8 @@ class ConnectivityDetailScreen extends StatelessWidget {
             'Last updated',
             _formatDateTime(current.updatedAt),
           ),
+          const SizedBox(height: 18),
+          _ConnectivityProgressCard(report: current),
           const SizedBox(height: 18),
           _StatusExplanation(status: current.status),
           const SizedBox(height: 18),
@@ -154,10 +157,10 @@ class _StatusExplanation extends StatelessWidget {
   Widget build(BuildContext context) {
     final message = switch (status.toLowerCase()) {
       'reviewed' =>
-        'Reviewed means an administrator has checked the report and is following up, but the connectivity issue is not confirmed as solved yet.',
+      'Reviewed means an administrator has checked the report and is following up, but the connectivity issue is not confirmed as solved yet.',
       'resolved' => 'Resolved means the connectivity issue has been completed.',
       _ =>
-        'Pending means the report is waiting for an administrator to review it.',
+      'Pending means the report is waiting for an administrator to review it.',
     };
     return Container(
       padding: const EdgeInsets.all(14),
@@ -172,6 +175,140 @@ class _StatusExplanation extends StatelessWidget {
           fontWeight: FontWeight.w600,
           height: 1.4,
         ),
+      ),
+    );
+  }
+}
+
+class _ConnectivityProgressCard extends StatelessWidget {
+  const _ConnectivityProgressCard({required this.report});
+
+  final ConnectivityReport report;
+
+  int get _stage => switch (report.status.toLowerCase()) {
+    'reviewed' => 1,
+    'resolved' => 2,
+    _ => 0,
+  };
+
+  @override
+  Widget build(BuildContext context) {
+    final updated = _formatDateTime(report.updatedAt);
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(18, 18, 18, 10),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text(
+              'Status history',
+              style: TextStyle(
+                color: navy,
+                fontSize: 20,
+                fontWeight: FontWeight.w800,
+              ),
+            ),
+            const SizedBox(height: 18),
+            _ConnectivityProgressStep(
+              title: 'Report submitted',
+              detail: _formatDateTime(report.createdAt),
+              completed: true,
+              current: _stage == 0,
+            ),
+            _ConnectivityProgressStep(
+              title: 'Reviewed by admin',
+              detail: _stage >= 1
+                  ? (_stage == 1 ? updated : 'Completed')
+                  : 'Waiting for review',
+              completed: _stage >= 1,
+              current: _stage == 1,
+            ),
+            _ConnectivityProgressStep(
+              title: 'Connectivity issue resolved',
+              detail: _stage == 2 ? updated : 'Waiting for resolution',
+              completed: _stage == 2,
+              current: _stage == 2,
+              isLast: true,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _ConnectivityProgressStep extends StatelessWidget {
+  const _ConnectivityProgressStep({
+    required this.title,
+    required this.detail,
+    required this.completed,
+    required this.current,
+    this.isLast = false,
+  });
+
+  final String title;
+  final String detail;
+  final bool completed;
+  final bool current;
+  final bool isLast;
+
+  @override
+  Widget build(BuildContext context) {
+    final color = current
+        ? safeOrange
+        : completed
+        ? safeTeal
+        : const Color(0xFFCBD5E1);
+    return SizedBox(
+      height: isLast ? 62 : 82,
+      child: Stack(
+        children: [
+          if (!isLast)
+            Positioned(
+              left: 17,
+              top: 34,
+              bottom: 0,
+              child: Container(
+                width: 3,
+                color: completed ? safeTeal : const Color(0xFFE2E8F0),
+              ),
+            ),
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Container(
+                width: 36,
+                height: 36,
+                decoration: BoxDecoration(color: color, shape: BoxShape.circle),
+                child: Icon(
+                  completed ? Icons.check_rounded : Icons.more_horiz_rounded,
+                  color: Colors.white,
+                  size: 21,
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      title,
+                      style: TextStyle(
+                        color: current || completed ? navy : mutedText,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                    const SizedBox(height: 3),
+                    Text(
+                      detail,
+                      style: const TextStyle(color: mutedText, fontSize: 12),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ],
       ),
     );
   }
@@ -237,6 +374,7 @@ class _ConnectivityEditDialogState extends State<_ConnectivityEditDialog> {
   late final TextEditingController _notes;
   late final TextEditingController _area;
   late String _issueType;
+  bool _checkingArea = false;
 
   @override
   void initState() {
@@ -305,25 +443,104 @@ class _ConnectivityEditDialogState extends State<_ConnectivityEditDialog> {
         child: const Text('Cancel'),
       ),
       FilledButton(
-        onPressed: () {
-          if (!_key.currentState!.validate()) return;
-          Navigator.pop(
-            context,
-            _ConnectivityInput(
-              issueType: _issueType,
-              carrier: _carrier.text.trim(),
-              notes: _notes.text.trim(),
-              area: _area.text.trim(),
-            ),
-          );
-        },
-        child: const Text('Save changes'),
+        onPressed: _checkingArea ? null : _confirmAndSave,
+        child: Text(_checkingArea ? 'Checking address...' : 'Save changes'),
       ),
     ],
   );
 
   String? _required(String? value) =>
       value == null || value.trim().isEmpty ? 'This field is required' : null;
+
+  Future<void> _confirmAndSave() async {
+    if (!_key.currentState!.validate()) return;
+    var confirmedArea = _area.text.trim();
+
+    if (confirmedArea != widget.report.area.trim()) {
+      setState(() => _checkingArea = true);
+      try {
+        final query = confirmedArea.toLowerCase().contains('malaysia')
+            ? confirmedArea
+            : '$confirmedArea, Malaysia';
+        final locations = await geo.locationFromAddress(query);
+        if (!mounted || locations.isEmpty) {
+          if (mounted) _showAddressError();
+          return;
+        }
+        final location = locations.first;
+        final places = await geo.placemarkFromCoordinates(
+          location.latitude,
+          location.longitude,
+        );
+        if (!mounted) return;
+        if (places.isNotEmpty) {
+          final place = places.first;
+          final parts =
+          <String?>[
+            place.street,
+            place.subLocality,
+            place.locality,
+            place.administrativeArea,
+            place.postalCode,
+            place.country,
+          ]
+              .whereType<String>()
+              .map((part) => part.trim())
+              .where((part) => part.isNotEmpty)
+              .toSet()
+              .toList();
+          if (parts.isNotEmpty) confirmedArea = parts.join(', ');
+        }
+
+        final confirmed = await showDialog<bool>(
+          context: context,
+          builder: (dialogContext) => AlertDialog(
+            title: const Text('Confirm affected area'),
+            content: Text(
+              'We found this address:\n\n$confirmedArea\n\nIs this correct?',
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(dialogContext, false),
+                child: const Text('Edit address'),
+              ),
+              FilledButton(
+                onPressed: () => Navigator.pop(dialogContext, true),
+                child: const Text('Confirm'),
+              ),
+            ],
+          ),
+        );
+        if (confirmed != true || !mounted) return;
+      } catch (_) {
+        if (mounted) _showAddressError();
+        return;
+      } finally {
+        if (mounted) setState(() => _checkingArea = false);
+      }
+    }
+
+    if (!mounted) return;
+    Navigator.pop(
+      context,
+      _ConnectivityInput(
+        issueType: _issueType,
+        carrier: _carrier.text.trim(),
+        notes: _notes.text.trim(),
+        area: confirmedArea,
+      ),
+    );
+  }
+
+  void _showAddressError() {
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text(
+          'Address not found. Enter a more specific Malaysian address.',
+        ),
+      ),
+    );
+  }
 }
 
 String _formatDateTime(String value) {
