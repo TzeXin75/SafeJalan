@@ -441,12 +441,6 @@ class DatabaseService {
         email TEXT NOT NULL UNIQUE COLLATE NOCASE,
         passwordHash TEXT NOT NULL,
         imagePath TEXT,
-        afterImagePath TEXT,
-        responsibleAgency TEXT NOT NULL DEFAULT '',
-        scheduledRepairDate TEXT NOT NULL DEFAULT '',
-        adminNote TEXT NOT NULL DEFAULT '',
-        completionNote TEXT NOT NULL DEFAULT '',
-        resolvedBy TEXT NOT NULL DEFAULT '',
         isAdmin INTEGER NOT NULL DEFAULT 0,
         isActive INTEGER NOT NULL DEFAULT 1,
         syncStatus TEXT NOT NULL DEFAULT 'pending',
@@ -843,6 +837,7 @@ class DatabaseService {
     }
 
     final existing = RoadReport.fromLocalMap(existingRows.first);
+    if (existing.syncStatus == 'pending') return;
     final merged = report.copyWith(
       id: existing.id,
       imagePath:

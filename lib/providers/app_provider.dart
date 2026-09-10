@@ -774,7 +774,11 @@ class AppProvider extends ChangeNotifier {
       final remoteRows = await _supabase.getVerifications();
       await _database.mergeRemoteVerifications(remoteRows);
       if (email.isNotEmpty) await _loadVerifications();
-    } catch (_) {}
+    } catch (error) {
+      lastSyncError = 'Verification sync failed: $error';
+      debugPrint('[SafeJalan sync] $lastSyncError');
+      notifyListeners();
+    }
   }
 
   Future<void> _startConnectivityListener() async {
@@ -923,7 +927,11 @@ class AppProvider extends ChangeNotifier {
       await _database.deleteSyncedConnectivityMissingFromRemote(remoteIds);
       connectivityReports = await _database.getConnectivityReports();
       notifyListeners();
-    } catch (_) {}
+    } catch (error) {
+      lastSyncError = 'Connectivity sync failed: $error';
+      debugPrint('[SafeJalan sync] $lastSyncError');
+      notifyListeners();
+    }
   }
 
   Future<void> addSafetyAnnouncement({
@@ -1002,7 +1010,11 @@ class AppProvider extends ChangeNotifier {
       await _database.deleteSyncedAnnouncementsMissingFromRemote(remoteIds);
       announcements = await _database.getSafetyAnnouncements();
       notifyListeners();
-    } catch (_) {}
+    } catch (error) {
+      lastSyncError = 'Announcement sync failed: $error';
+      debugPrint('[SafeJalan sync] $lastSyncError');
+      notifyListeners();
+    }
   }
 
   Future<void> _trySyncUser(UserAccount user, {String? previousEmail}) async {
