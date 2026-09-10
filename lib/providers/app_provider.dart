@@ -33,12 +33,20 @@ class AppProvider extends ChangeNotifier {
   bool isSyncing = false;
   String? lastSyncError;
   StreamSubscription<List<ConnectivityResult>>? _connectivitySubscription;
+  Timer? _reportRealtimeDebounce;
+  final Map<String, Timer> _sharedRealtimeDebounces = <String, Timer>{};
+  bool _isForegroundSyncing = false;
+  DateTime? _lastForegroundSyncAt;
+  int _leaderboardRevision = 0;
+  int _usersRevision = 0;
   bool _hadNetwork = false;
   final Set<String> _verifiedReportIds = <String>{};
   final Set<String> _updatingVerificationIds = <String>{};
   final Set<String> _readAnnouncementIds = <String>{};
 
   bool get isRemoteConfigured => _reportsRepository.isRemoteConfigured;
+  int get leaderboardRevision => _leaderboardRevision;
+  int get usersRevision => _usersRevision;
   List<RoadReport> get adminVisibleReports => reports
       .where((report) => report.status.toLowerCase() != 'archived')
       .toList();
@@ -638,6 +646,87 @@ class AppProvider extends ChangeNotifier {
     }
   }
 
+  void startRealtimeSync() {
+    if (!_supabase.isConfigured) return;
+    _supabase.subscribeToReportChanges(_scheduleRealtimeReportRefresh);
+    _supabase.subscribeToSharedDataChanges(
+      onVerificationsChanged: () =>
+          _scheduleSharedRealtimeRefresh('verifications', () async {
+            await _syncPendingVerifications();
+            _leaderboardRevision++;
+            notifyListeners();
+          }),
+      onAnnouncementsChanged: () => _scheduleSharedRealtimeRefresh(
+        'announcements',
+        syncSafetyAnnouncements,
+      ),
+      onNotificationsChanged: () => _scheduleSharedRealtimeRefresh(
+        'notifications',
+        syncUserNotifications,
+      ),
+      onConnectivityChanged: () => _scheduleSharedRealtimeRefresh(
+        'connectivity',
+        syncConnectivityReports,
+      ),
+      onUsersChanged: () => _scheduleSharedRealtimeRefresh('users', () async {
+        await syncUsers();
+        _leaderboardRevision++;
+        _usersRevision++;
+        notifyListeners();
+      }),
+    );
+  }
+
+  void _scheduleSharedRealtimeRefresh(
+    String key,
+    Future<void> Function() refresh,
+  ) {
+    _sharedRealtimeDebounces.remove(key)?.cancel();
+    _sharedRealtimeDebounces[key] = Timer(
+      const Duration(milliseconds: 350),
+      () {
+        _sharedRealtimeDebounces.remove(key);
+        unawaited(refresh());
+      },
+    );
+  }
+
+  void _scheduleRealtimeReportRefresh() {
+    _reportRealtimeDebounce?.cancel();
+    _reportRealtimeDebounce = Timer(
+      const Duration(milliseconds: 350),
+      _refreshReportsAfterRealtimeEvent,
+    );
+  }
+
+  Future<void> _refreshReportsAfterRealtimeEvent() async {
+    if (isSyncing) {
+      _reportRealtimeDebounce = Timer(
+        const Duration(milliseconds: 500),
+        _refreshReportsAfterRealtimeEvent,
+      );
+      return;
+    }
+    await syncReportsFromSupabase();
+  }
+
+  Future<void> syncOnAppResume() async {
+    if (!_supabase.isConfigured || _isForegroundSyncing) return;
+    final now = DateTime.now();
+    if (_lastForegroundSyncAt != null &&
+        now.difference(_lastForegroundSyncAt!) < const Duration(seconds: 2)) {
+      return;
+    }
+    _lastForegroundSyncAt = now;
+    _isForegroundSyncing = true;
+    try {
+      startRealtimeSync();
+      await _retryPendingData();
+    } finally {
+      _isForegroundSyncing = false;
+    }
+  }
+
   Future<void> _syncAllUsers() async {
     if (!_supabase.isConfigured) return;
     const legacyAdminEmail = 'admin@safejalan.my';
@@ -1113,6 +1202,12 @@ class AppProvider extends ChangeNotifier {
 
   @override
   void dispose() {
+    _reportRealtimeDebounce?.cancel();
+    for (final timer in _sharedRealtimeDebounces.values) {
+      timer.cancel();
+    }
+    _sharedRealtimeDebounces.clear();
+    unawaited(_supabase.unsubscribeFromRealtimeChanges());
     _connectivitySubscription?.cancel();
     super.dispose();
   }

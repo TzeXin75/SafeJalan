@@ -13,6 +13,8 @@ class SupabaseService {
 
   bool _isConfigured = false;
   bool _storageReady = false;
+  RealtimeChannel? _reportChangesChannel;
+  RealtimeChannel? _sharedDataChangesChannel;
   static const String _imageBucket = 'safejalan-images';
   String? initialisationError;
 
@@ -36,6 +38,76 @@ class SupabaseService {
         .select()
         .order('created_on', ascending: false);
     return rows.map(RoadReport.fromRemoteMap).toList();
+  }
+
+  void subscribeToReportChanges(void Function() onChanged) {
+    if (!isConfigured || _reportChangesChannel != null) return;
+    _reportChangesChannel = _client
+        .channel('public:road_reports')
+        .onPostgresChanges(
+          event: PostgresChangeEvent.all,
+          schema: 'public',
+          table: 'road_reports',
+          callback: (_) => onChanged(),
+        )
+        .subscribe();
+  }
+
+  void subscribeToSharedDataChanges({
+    required void Function() onVerificationsChanged,
+    required void Function() onAnnouncementsChanged,
+    required void Function() onNotificationsChanged,
+    required void Function() onConnectivityChanged,
+    required void Function() onUsersChanged,
+  }) {
+    if (!isConfigured || _sharedDataChangesChannel != null) return;
+    _sharedDataChangesChannel = _client
+        .channel('public:safejalan_shared_data')
+        .onPostgresChanges(
+          event: PostgresChangeEvent.all,
+          schema: 'public',
+          table: 'report_verifications',
+          callback: (_) => onVerificationsChanged(),
+        )
+        .onPostgresChanges(
+          event: PostgresChangeEvent.all,
+          schema: 'public',
+          table: 'safety_announcements',
+          callback: (_) => onAnnouncementsChanged(),
+        )
+        .onPostgresChanges(
+          event: PostgresChangeEvent.all,
+          schema: 'public',
+          table: 'user_notifications',
+          callback: (_) => onNotificationsChanged(),
+        )
+        .onPostgresChanges(
+          event: PostgresChangeEvent.all,
+          schema: 'public',
+          table: 'connectivity_reports',
+          callback: (_) => onConnectivityChanged(),
+        )
+        .onPostgresChanges(
+          event: PostgresChangeEvent.all,
+          schema: 'public',
+          table: 'user_profiles',
+          callback: (_) => onUsersChanged(),
+        )
+        .subscribe();
+  }
+
+  Future<void> unsubscribeFromRealtimeChanges() async {
+    final reportChannel = _reportChangesChannel;
+    final sharedChannel = _sharedDataChangesChannel;
+    _reportChangesChannel = null;
+    _sharedDataChangesChannel = null;
+    if (!isConfigured) return;
+    if (reportChannel != null) {
+      await _client.removeChannel(reportChannel);
+    }
+    if (sharedChannel != null) {
+      await _client.removeChannel(sharedChannel);
+    }
   }
 
   Future<void> upsertReport(RoadReport report) async {

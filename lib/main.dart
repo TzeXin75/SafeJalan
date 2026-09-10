@@ -42,16 +42,43 @@ Future<void> _bootstrap(AppProvider appProvider) async {
   }
   await localInitialisation;
   if (SupabaseService.instance.isConfigured) {
-    await appProvider.syncReports();
+    await appProvider.syncReportsFromSupabase();
     await appProvider.syncConnectivityReports();
     await appProvider.syncSafetyAnnouncements();
     await appProvider.syncAnnouncementReads();
     await appProvider.syncUsers();
+    appProvider.startRealtimeSync();
   }
 }
 
-class SafeJalanApp extends StatelessWidget {
+class SafeJalanApp extends StatefulWidget {
   const SafeJalanApp({super.key});
+
+  @override
+  State<SafeJalanApp> createState() => _SafeJalanAppState();
+}
+
+class _SafeJalanAppState extends State<SafeJalanApp>
+    with WidgetsBindingObserver {
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      unawaited(context.read<AppProvider>().syncOnAppResume());
+    }
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
   @override
   Widget build(BuildContext context) => MaterialApp(
     title: 'SafeJalan',

@@ -26,6 +26,7 @@ class _AdminReportDetailScreenState extends State<AdminReportDetailScreen> {
   DateTime? _scheduledDate;
   File? _afterImage;
   bool _saving = false;
+  bool _editingResolved = false;
 
   @override
   void initState() {
@@ -48,6 +49,14 @@ class _AdminReportDetailScreenState extends State<AdminReportDetailScreen> {
   @override
   Widget build(BuildContext context) {
     final report = context.watch<AppProvider>().latestVersionOf(widget.report);
+    final showCompletionCard =
+        report.status.toLowerCase() == 'resolved' &&
+        !_editingResolved &&
+        (report.afterImagePath?.isNotEmpty == true ||
+            report.responsibleAgency.isNotEmpty ||
+            report.scheduledRepairDate.isNotEmpty ||
+            report.adminNote.isNotEmpty ||
+            report.completionNote.isNotEmpty);
     return Scaffold(
       appBar: AppBar(
         title: Column(
@@ -110,143 +119,151 @@ class _AdminReportDetailScreenState extends State<AdminReportDetailScreen> {
             ),
           ),
           const SizedBox(height: 12),
-          Card(
-            child: Padding(
-              padding: const EdgeInsets.all(16),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const Text(
-                    'Update maintenance',
-                    style: TextStyle(
-                      color: navy,
-                      fontSize: 20,
-                      fontWeight: FontWeight.w800,
-                    ),
-                  ),
-                  const SizedBox(height: 16),
-                  DropdownButtonFormField<String>(
-                    initialValue: _normalisedStatus(_status),
-                    decoration: safeInput('Current status'),
-                    items:
-                        const [
-                              'Pending',
-                              'Reviewed',
-                              'In Progress',
-                              'Resolved',
-                              'Rejected',
-                            ]
-                            .map(
-                              (value) => DropdownMenuItem(
-                                value: value,
-                                child: Text(value),
-                              ),
-                            )
-                            .toList(),
-                    onChanged: (value) => setState(() => _status = value!),
-                  ),
-                  const SizedBox(height: 12),
-                  TextField(
-                    controller: _agency,
-                    decoration: safeInput(
-                      'Responsible agency',
-                      icon: Icons.apartment_outlined,
-                    ),
-                  ),
-                  const SizedBox(height: 12),
-                  InkWell(
-                    onTap: _pickDate,
-                    child: InputDecorator(
-                      decoration: safeInput(
-                        'Scheduled repair date',
-                        icon: Icons.calendar_today_outlined,
-                      ),
-                      child: Text(
-                        _scheduledDate == null
-                            ? 'Select a date'
-                            : _scheduledDate!
-                                  .toIso8601String()
-                                  .split('T')
-                                  .first,
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 12),
-                  TextField(
-                    controller: _adminNote,
-                    maxLines: 3,
-                    decoration: safeInput('Admin note'),
-                  ),
-                  if (_status.toLowerCase() == 'resolved') ...[
-                    const SizedBox(height: 14),
+          if (showCompletionCard)
+            _CompletionSummaryCard(
+              report: report,
+              onEdit: () => setState(() => _editingResolved = true),
+            )
+          else
+            Card(
+              child: Padding(
+                padding: const EdgeInsets.all(16),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
                     const Text(
-                      'Repair evidence',
-                      style: TextStyle(fontWeight: FontWeight.w800),
+                      'Update maintenance',
+                      style: TextStyle(
+                        color: navy,
+                        fontSize: 20,
+                        fontWeight: FontWeight.w800,
+                      ),
                     ),
-                    const SizedBox(height: 8),
-                    InkWell(
-                      borderRadius: BorderRadius.circular(16),
-                      onTap: _pickAfterImage,
-                      child: ClipRRect(
-                        borderRadius: BorderRadius.circular(16),
-                        child: SizedBox(
-                          height: 160,
-                          width: double.infinity,
-                          child: _afterImage != null
-                              ? Image.file(_afterImage!, fit: BoxFit.cover)
-                              : StoredImage(
-                                  path: report.afterImagePath,
-                                  fallback: ColoredBox(
-                                    color: primary.withValues(alpha: .08),
-                                    child: const Column(
-                                      mainAxisAlignment:
-                                          MainAxisAlignment.center,
-                                      children: [
-                                        Icon(
-                                          Icons.add_a_photo_outlined,
-                                          color: primary,
-                                          size: 38,
-                                        ),
-                                        SizedBox(height: 8),
-                                        Text('Add repair completion photo'),
-                                      ],
-                                    ),
-                                  ),
+                    const SizedBox(height: 16),
+                    DropdownButtonFormField<String>(
+                      initialValue: _normalisedStatus(_status),
+                      decoration: safeInput('Current status'),
+                      items:
+                          const [
+                                'Pending',
+                                'Reviewed',
+                                'In Progress',
+                                'Resolved',
+                                'Rejected',
+                              ]
+                              .map(
+                                (value) => DropdownMenuItem(
+                                  value: value,
+                                  child: Text(value),
                                 ),
+                              )
+                              .toList(),
+                      onChanged: (value) => setState(() => _status = value!),
+                    ),
+                    const SizedBox(height: 12),
+                    TextField(
+                      controller: _agency,
+                      decoration: safeInput(
+                        'Responsible agency',
+                        icon: Icons.apartment_outlined,
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    InkWell(
+                      onTap: _pickDate,
+                      child: InputDecorator(
+                        decoration: safeInput(
+                          'Scheduled repair date',
+                          icon: Icons.calendar_today_outlined,
+                        ),
+                        child: Text(
+                          _scheduledDate == null
+                              ? 'Select a date'
+                              : _scheduledDate!
+                                    .toIso8601String()
+                                    .split('T')
+                                    .first,
                         ),
                       ),
                     ),
                     const SizedBox(height: 12),
                     TextField(
-                      controller: _completionNote,
+                      controller: _adminNote,
                       maxLines: 3,
-                      decoration: safeInput('Completion note'),
+                      decoration: safeInput('Admin note'),
                     ),
-                  ],
-                  const SizedBox(height: 18),
-                  Row(
-                    children: [
-                      Expanded(
-                        child: OutlinedButton(
-                          onPressed: _saving
-                              ? null
-                              : () => _save(report, keepStatus: true),
-                          child: const Text('Save draft'),
+                    if (_status.toLowerCase() == 'resolved') ...[
+                      const SizedBox(height: 14),
+                      const Text(
+                        'Repair evidence',
+                        style: TextStyle(fontWeight: FontWeight.w800),
+                      ),
+                      const SizedBox(height: 8),
+                      InkWell(
+                        borderRadius: BorderRadius.circular(16),
+                        onTap: _pickAfterImage,
+                        child: ClipRRect(
+                          borderRadius: BorderRadius.circular(16),
+                          child: SizedBox(
+                            height: 160,
+                            width: double.infinity,
+                            child: _afterImage != null
+                                ? Image.file(_afterImage!, fit: BoxFit.cover)
+                                : StoredImage(
+                                    path: report.afterImagePath,
+                                    fallback: ColoredBox(
+                                      color: primary.withValues(alpha: .08),
+                                      child: const Column(
+                                        mainAxisAlignment:
+                                            MainAxisAlignment.center,
+                                        children: [
+                                          Icon(
+                                            Icons.add_a_photo_outlined,
+                                            color: primary,
+                                            size: 38,
+                                          ),
+                                          SizedBox(height: 8),
+                                          Text('Add repair completion photo'),
+                                        ],
+                                      ),
+                                    ),
+                                  ),
+                          ),
                         ),
                       ),
-                      const SizedBox(width: 10),
-                      Expanded(
-                        child: FilledButton(
-                          onPressed: _saving ? null : () => _save(report),
-                          child: Text(_saving ? 'Saving...' : 'Update status'),
-                        ),
+                      const SizedBox(height: 12),
+                      TextField(
+                        controller: _completionNote,
+                        maxLines: 3,
+                        decoration: safeInput('Completion note'),
                       ),
                     ],
-                  ),
-                ],
+                    const SizedBox(height: 18),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: OutlinedButton(
+                            onPressed: _saving
+                                ? null
+                                : () => _save(report, keepStatus: true),
+                            child: const Text('Save draft'),
+                          ),
+                        ),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: FilledButton(
+                            onPressed: _saving ? null : () => _save(report),
+                            child: Text(
+                              _saving ? 'Saving...' : 'Update status',
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
               ),
             ),
-          ),
           const SizedBox(height: 12),
           Card(
             child: Padding(
@@ -358,12 +375,116 @@ class _AdminReportDetailScreenState extends State<AdminReportDetailScreen> {
       _showMessage('Maintenance draft saved.');
       return;
     }
+    if (nextStatus.toLowerCase() == 'resolved') {
+      setState(() {
+        _status = nextStatus;
+        _afterImage = null;
+        _editingResolved = false;
+      });
+      _showMessage('Repair completion saved.');
+      return;
+    }
     Navigator.pop(context, true);
   }
 
   void _showMessage(String message) => ScaffoldMessenger.of(
     context,
   ).showSnackBar(SnackBar(content: Text(message)));
+}
+
+class _CompletionSummaryCard extends StatelessWidget {
+  const _CompletionSummaryCard({required this.report, required this.onEdit});
+
+  final RoadReport report;
+  final VoidCallback onEdit;
+
+  @override
+  Widget build(BuildContext context) => Card(
+    child: Padding(
+      padding: const EdgeInsets.all(16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                width: 42,
+                height: 42,
+                decoration: BoxDecoration(
+                  color: safeTeal.withValues(alpha: .12),
+                  shape: BoxShape.circle,
+                ),
+                child: const Icon(Icons.check_rounded, color: safeTeal),
+              ),
+              const SizedBox(width: 12),
+              const Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Repair completed',
+                      style: TextStyle(
+                        color: navy,
+                        fontSize: 19,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                    Text(
+                      'Saved maintenance summary',
+                      style: TextStyle(color: mutedText, fontSize: 12),
+                    ),
+                  ],
+                ),
+              ),
+              LabelBadge('Resolved', Colors.green),
+            ],
+          ),
+          if (report.afterImagePath?.isNotEmpty == true) ...[
+            const SizedBox(height: 16),
+            ClipRRect(
+              borderRadius: BorderRadius.circular(16),
+              child: SizedBox(
+                height: 180,
+                width: double.infinity,
+                child: StoredImage(
+                  path: report.afterImagePath,
+                  fallback: const ColoredBox(
+                    color: Color(0xFFF2F4F7),
+                    child: Center(child: Icon(Icons.broken_image_outlined)),
+                  ),
+                ),
+              ),
+            ),
+          ],
+          _DetailRow(
+            Icons.apartment_outlined,
+            'Agency',
+            report.responsibleAgency,
+          ),
+          _DetailRow(
+            Icons.calendar_today_outlined,
+            'Repair date',
+            report.scheduledRepairDate,
+          ),
+          _DetailRow(Icons.notes_outlined, 'Admin note', report.adminNote),
+          _DetailRow(
+            Icons.fact_check_outlined,
+            'Completion',
+            report.completionNote,
+          ),
+          const SizedBox(height: 16),
+          SizedBox(
+            width: double.infinity,
+            child: OutlinedButton.icon(
+              onPressed: onEdit,
+              icon: const Icon(Icons.edit_outlined),
+              label: const Text('Edit completion details'),
+            ),
+          ),
+        ],
+      ),
+    ),
+  );
 }
 
 class _ReportImageFallback extends StatelessWidget {

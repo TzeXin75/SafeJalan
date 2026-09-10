@@ -42,15 +42,18 @@ class _LeaderboardScreenState extends State<LeaderboardScreen> {
     await refreshed;
   }
 
-  int _signatureOf(AppProvider app) => Object.hashAll(
-    app.reports.map(
-      (report) => Object.hash(
-        report.id,
-        report.remoteId,
-        report.reporterEmail,
-        report.votes,
-        report.updatedAt,
-        report.isDeleted,
+  int _signatureOf(AppProvider app) => Object.hash(
+    app.leaderboardRevision,
+    Object.hashAll(
+      app.reports.map(
+        (report) => Object.hash(
+          report.id,
+          report.remoteId,
+          report.reporterEmail,
+          report.votes,
+          report.updatedAt,
+          report.isDeleted,
+        ),
       ),
     ),
   );

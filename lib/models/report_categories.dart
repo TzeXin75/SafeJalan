@@ -16,6 +16,17 @@ const reportCategories = <String>[
 ];
 
 typedef ReportImageLabel = ({String text, double confidence});
+typedef ReportCategorySuggestion = ({String category, double confidence});
+
+class ReportCategoryAnalysis {
+  final List<ReportCategorySuggestion> suggestions;
+  final bool canAutoSelect;
+
+  const ReportCategoryAnalysis({
+    required this.suggestions,
+    required this.canAutoSelect,
+  });
+}
 
 const _categoryLabelWeights = <String, Map<String, double>>{
   'Pothole': {
@@ -32,13 +43,17 @@ const _categoryLabelWeights = <String, Map<String, double>>{
     'broken pavement': 3.0,
     'asphalt': 1.8,
     'crack': 2.8,
-    'rubble': 1.0,
-    'construction': .6,
-    'road': .2,
+    'collapsed pavement': 3.4,
+    'surface damage': 3.0,
   },
   'Traffic Signals': {
+    'fallen traffic light': 4.5,
+    'broken traffic light': 4.5,
+    'traffic light pole': 4.4,
+    'signal pole': 4.2,
     'traffic light': 4.0,
     'traffic signal': 4.0,
+    'traffic control device': 3.8,
     'stoplight': 4.0,
     'signal light': 3.5,
     'signal': 1.5,
@@ -155,9 +170,12 @@ const _categoryLabelWeights = <String, Map<String, double>>{
   },
 };
 
-(String, double)? suggestReportCategory(Iterable<ReportImageLabel> labels) {
+ReportCategoryAnalysis analyseReportCategories(
+  Iterable<ReportImageLabel> labels,
+) {
   final scores = <String, double>{};
-  final strongestConfidence = <String, double>{};
+  final strongestWeights = <String, double>{};
+  final strongestConfidences = <String, double>{};
 
   for (final label in labels) {
     final text = label.text.trim().toLowerCase().replaceAll(
@@ -176,30 +194,51 @@ const _categoryLabelWeights = <String, Map<String, double>>{
       if (strongestWeight == 0) continue;
       scores[category] =
           (scores[category] ?? 0) + label.confidence * strongestWeight;
-      if (label.confidence > (strongestConfidence[category] ?? 0)) {
-        strongestConfidence[category] = label.confidence;
+      final previousWeight = strongestWeights[category] ?? 0;
+      final previousConfidence = strongestConfidences[category] ?? 0;
+      if (strongestWeight > previousWeight ||
+          (strongestWeight == previousWeight &&
+              label.confidence > previousConfidence)) {
+        strongestWeights[category] = strongestWeight;
+        strongestConfidences[category] = label.confidence;
       }
     }
   }
 
-  String? bestCategory;
-  var bestScore = 0.0;
+  final ranked = <({String category, double score, double confidence})>[];
   for (final category in reportCategories) {
     final score = scores[category] ?? 0;
-    if (score > bestScore) {
-      bestCategory = category;
-      bestScore = score;
+    final strongestWeight = strongestWeights[category] ?? 0;
+    final strongestConfidence = strongestConfidences[category] ?? 0;
+    if (score < .8 || strongestWeight < 2.4 || strongestConfidence < .45) {
+      continue;
     }
+    final evidence = (score / 4).clamp(0.0, 1.0);
+    final specificity = (strongestWeight / 4.5).clamp(0.0, 1.0);
+    final confidence =
+        (strongestConfidence * .7 + evidence * .2 + specificity * .1).clamp(
+          0.0,
+          .99,
+        );
+    ranked.add((category: category, score: score, confidence: confidence));
   }
-  if (bestCategory == null || bestScore < .35) return null;
+  ranked.sort((first, second) => second.score.compareTo(first.score));
 
-  final evidence = (bestScore / 3).clamp(0.0, 1.0);
-  final confidence =
-      ((strongestConfidence[bestCategory] ?? 0) * .75 + evidence * .25).clamp(
-        0.0,
-        .99,
-      );
-  return (bestCategory, confidence);
+  if (ranked.isEmpty) {
+    return const ReportCategoryAnalysis(suggestions: [], canAutoSelect: false);
+  }
+
+  final top = ranked.first;
+  final hasClearLead =
+      ranked.length == 1 || top.score >= ranked[1].score * 1.25;
+  final suggestions = ranked
+      .take(3)
+      .map((item) => (category: item.category, confidence: item.confidence))
+      .toList(growable: false);
+  return ReportCategoryAnalysis(
+    suggestions: suggestions,
+    canAutoSelect: top.confidence >= .68 && hasClearLead,
+  );
 }
 
 List<String> reportCategoryOptions(String currentCategory) {

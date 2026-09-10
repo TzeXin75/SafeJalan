@@ -31,7 +31,7 @@ class _ReportFormScreenState extends State<ReportFormScreen> {
   final _title = TextEditingController(),
       _description = TextEditingController(),
       _locationName = TextEditingController(text: 'Jalan Ampang, KL');
-  String _category = 'Pothole', _severity = 'High';
+  String _category = '', _severity = 'High';
   File? _image;
   double _lat = 3.1585, _lng = 101.7123;
   bool _locating = false;
@@ -40,6 +40,7 @@ class _ReportFormScreenState extends State<ReportFormScreen> {
   bool _gpsEnabled = false;
   bool _checkingDuplicates = false;
   String? _aiSuggestion;
+  List<ReportCategorySuggestion> _aiCandidates = const [];
   String? _imageError;
   String? _locationMessage;
   int _analysisRun = 0;
@@ -85,6 +86,7 @@ class _ReportFormScreenState extends State<ReportFormScreen> {
       _imageError = null;
       _analysingImage = true;
       _aiSuggestion = null;
+      _aiCandidates = const [];
     });
     await _detectCategory(picked.path);
   }
@@ -99,6 +101,7 @@ class _ReportFormScreenState extends State<ReportFormScreen> {
       setState(() {
         _analysisRun++;
         _analysingImage = false;
+        _aiCandidates = const [];
         _aiSuggestion =
             'AI is taking too long. Detection stopped; select a category manually.';
       });
@@ -107,22 +110,28 @@ class _ReportFormScreenState extends State<ReportFormScreen> {
       final labels = await labeler.processImage(
         InputImage.fromFilePath(imagePath),
       );
-      final result = _categoryFromLabels(labels);
+      final analysis = _categoryFromLabels(labels);
       if (!mounted || analysisRun != _analysisRun) return;
       setState(() {
         _analysingImage = false;
-        if (result == null) {
-          _aiSuggestion = 'AI could not determine a category';
-        } else {
-          _category = result.$1;
+        _aiCandidates = analysis.suggestions;
+        if (analysis.suggestions.isEmpty) {
+          _aiSuggestion = 'AI is unsure — please select a category';
+        } else if (analysis.canAutoSelect) {
+          final suggestion = analysis.suggestions.first;
+          _category = suggestion.category;
+          _aiCandidates = const [];
           _aiSuggestion =
-              'AI suggested ${result.$1} · ${(result.$2 * 100).round()}%';
+              'AI suggested ${suggestion.category} · ${(suggestion.confidence * 100).round()}%';
+        } else {
+          _aiSuggestion = 'AI is unsure — choose the closest category below';
         }
       });
     } catch (_) {
       if (mounted && analysisRun == _analysisRun) {
         setState(() {
           _analysingImage = false;
+          _aiCandidates = const [];
           _aiSuggestion = 'AI analysis unavailable. Select manually.';
         });
       }
@@ -131,8 +140,8 @@ class _ReportFormScreenState extends State<ReportFormScreen> {
     }
   }
 
-  (String, double)? _categoryFromLabels(List<ImageLabel> labels) {
-    return suggestReportCategory(
+  ReportCategoryAnalysis _categoryFromLabels(List<ImageLabel> labels) {
+    return analyseReportCategories(
       labels.map((label) => (text: label.label, confidence: label.confidence)),
     );
   }
@@ -142,6 +151,7 @@ class _ReportFormScreenState extends State<ReportFormScreen> {
     setState(() {
       _analysisRun++;
       _analysingImage = false;
+      _aiCandidates = const [];
       _aiSuggestion = 'AI detection cancelled. Select a category manually.';
     });
   }
@@ -445,6 +455,8 @@ class _ReportFormScreenState extends State<ReportFormScreen> {
       _image = null;
       _imageError = null;
       _aiSuggestion = null;
+      _aiCandidates = const [];
+      _category = '';
       _analysingImage = false;
       _checkingDuplicates = false;
     });
@@ -620,38 +632,71 @@ class _ReportFormScreenState extends State<ReportFormScreen> {
                       borderRadius: BorderRadius.circular(14),
                       border: Border.all(color: primary.withValues(alpha: .12)),
                     ),
-                    child: Row(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        if (_analysingImage)
-                          const SizedBox(
-                            width: 18,
-                            height: 18,
-                            child: CircularProgressIndicator(strokeWidth: 2),
-                          )
-                        else
-                          const Icon(
-                            Icons.auto_awesome,
-                            color: primary,
-                            size: 19,
-                          ),
-                        const SizedBox(width: 10),
-                        Expanded(
-                          child: Text(
-                            _analysingImage
-                                ? 'AI is analysing the photo...'
-                                : _aiSuggestion!,
-                            style: const TextStyle(
-                              color: navy,
-                              fontSize: 12,
-                              fontWeight: FontWeight.w600,
+                        Row(
+                          children: [
+                            if (_analysingImage)
+                              const SizedBox(
+                                width: 18,
+                                height: 18,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                ),
+                              )
+                            else
+                              const Icon(
+                                Icons.auto_awesome,
+                                color: primary,
+                                size: 19,
+                              ),
+                            const SizedBox(width: 10),
+                            Expanded(
+                              child: Text(
+                                _analysingImage
+                                    ? 'AI is analysing the photo...'
+                                    : _aiSuggestion!,
+                                style: const TextStyle(
+                                  color: navy,
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
                             ),
-                          ),
+                            if (_analysingImage)
+                              TextButton(
+                                onPressed: _cancelImageAnalysis,
+                                child: const Text('Cancel'),
+                              ),
+                          ],
                         ),
-                        if (_analysingImage)
-                          TextButton(
-                            onPressed: _cancelImageAnalysis,
-                            child: const Text('Cancel'),
+                        if (_aiCandidates.isNotEmpty) ...[
+                          const SizedBox(height: 10),
+                          Wrap(
+                            spacing: 7,
+                            runSpacing: 7,
+                            children: _aiCandidates
+                                .map(
+                                  (suggestion) => ActionChip(
+                                    avatar: const Icon(
+                                      Icons.check_circle_outline,
+                                      size: 17,
+                                    ),
+                                    label: Text(
+                                      '${suggestion.category} ${(suggestion.confidence * 100).round()}%',
+                                    ),
+                                    onPressed: () => setState(() {
+                                      _category = suggestion.category;
+                                      _aiSuggestion =
+                                          'Selected ${suggestion.category} from AI suggestions';
+                                      _aiCandidates = const [];
+                                    }),
+                                  ),
+                                )
+                                .toList(),
                           ),
+                        ],
                       ],
                     ),
                   ),
@@ -670,12 +715,15 @@ class _ReportFormScreenState extends State<ReportFormScreen> {
                 const SizedBox(height: 12),
                 DropdownButtonFormField<String>(
                   key: ValueKey(_category),
-                  initialValue: _category,
+                  initialValue: _category.isEmpty ? null : _category,
                   decoration: safeInput('Category'),
                   items: reportCategories
                       .map((v) => DropdownMenuItem(value: v, child: Text(v)))
                       .toList(),
                   onChanged: (v) => setState(() => _category = v!),
+                  validator: (value) => value == null || value.isEmpty
+                      ? 'Please select a category'
+                      : null,
                 ),
                 const SizedBox(height: 12),
                 const Text(

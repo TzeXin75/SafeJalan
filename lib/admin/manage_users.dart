@@ -13,10 +13,21 @@ class ManageUsersScreen extends StatefulWidget {
 
 class _ManageUsersScreenState extends State<ManageUsersScreen> {
   late Future<List<UserAccount>> _users;
+  late int _usersRevision;
 
   @override
   void initState() {
     super.initState();
+    _usersRevision = context.read<AppProvider>().usersRevision;
+    _reload();
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final revision = context.watch<AppProvider>().usersRevision;
+    if (revision == _usersRevision) return;
+    _usersRevision = revision;
     _reload();
   }
 
