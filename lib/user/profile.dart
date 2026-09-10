@@ -16,10 +16,11 @@ class ProfileScreen extends StatelessWidget {
     final connectivityReports = app.connectivityReports
         .where(
           (report) =>
-      report.reporterEmail.toLowerCase() == app.email.toLowerCase(),
+      !report.isDeleted &&
+          report.reporterEmail.toLowerCase() == app.email.toLowerCase(),
     )
         .toList();
-    const badges = [
+    const roadBadges = [
       _BadgeInfo(Icons.flag_rounded, 'First Step', 1, Color(0xFF4361EE)),
       _BadgeInfo(Icons.explore_rounded, 'Road Scout', 3, Color(0xFF0EA5E9)),
       _BadgeInfo(
@@ -41,13 +42,33 @@ class ProfileScreen extends StatelessWidget {
         Color(0xFF8B5CF6),
       ),
     ];
-    final lockedBadges = badges.where(
-          (badge) => reportCount < badge.requiredReports,
-    );
-    final nextBadge = lockedBadges.isEmpty ? null : lockedBadges.first;
-    final badgeProgress = nextBadge == null
-        ? 1.0
-        : (reportCount / nextBadge.requiredReports).clamp(0.0, 1.0);
+    const connectivityBadges = [
+      _BadgeInfo(
+        Icons.cell_tower_rounded,
+        'Signal Spotter',
+        1,
+        Color(0xFF4361EE),
+      ),
+      _BadgeInfo(Icons.radar_rounded, 'Network Scout', 3, Color(0xFF0EA5E9)),
+      _BadgeInfo(
+        Icons.wifi_find_rounded,
+        'Coverage Helper',
+        5,
+        Color(0xFF12B886),
+      ),
+      _BadgeInfo(
+        Icons.hub_rounded,
+        'Digital Connector',
+        10,
+        Color(0xFFFF9F1C),
+      ),
+      _BadgeInfo(
+        Icons.public_rounded,
+        'Connectivity Hero',
+        20,
+        Color(0xFF8B5CF6),
+      ),
+    ];
     return SafeArea(
       child: ListView(
         padding: const EdgeInsets.all(16),
@@ -162,95 +183,20 @@ class ProfileScreen extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 18),
-          const PageTitle('Badge Progress', 'Your community milestones'),
-          const SizedBox(height: 8),
-          Card(
-            child: Padding(
-              padding: const EdgeInsets.all(16),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    children: [
-                      CircleAvatar(
-                        radius: 20,
-                        backgroundColor:
-                        (nextBadge?.color ?? const Color(0xFF12B886))
-                            .withValues(alpha: .12),
-                        child: Icon(
-                          nextBadge?.icon ?? Icons.verified_rounded,
-                          color: nextBadge?.color ?? const Color(0xFF12B886),
-                        ),
-                      ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              nextBadge == null
-                                  ? 'All badges unlocked!'
-                                  : 'Next: ${nextBadge.name}',
-                              style: const TextStyle(
-                                fontWeight: FontWeight.w800,
-                                fontSize: 15,
-                              ),
-                            ),
-                            Text(
-                              nextBadge == null
-                                  ? '$reportCount reports completed'
-                                  : '$reportCount / ${nextBadge.requiredReports} reports',
-                              style: const TextStyle(
-                                color: mutedText,
-                                fontSize: 12,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                      Text(
-                        '${(badgeProgress * 100).round()}%',
-                        style: TextStyle(
-                          color: nextBadge?.color ?? const Color(0xFF12B886),
-                          fontWeight: FontWeight.w800,
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 14),
-                  ClipRRect(
-                    borderRadius: BorderRadius.circular(99),
-                    child: LinearProgressIndicator(
-                      value: badgeProgress,
-                      minHeight: 9,
-                      backgroundColor: const Color(0xFFE8ECF4),
-                      color: nextBadge?.color ?? const Color(0xFF12B886),
-                    ),
-                  ),
-                ],
-              ),
-            ),
+          _BadgeSection(
+            title: 'Road Report Badges',
+            subtitle: 'Milestones from road reports',
+            count: reportCount,
+            unit: 'road reports',
+            badges: roadBadges,
           ),
-          const SizedBox(height: 10),
-          LayoutBuilder(
-            builder: (context, constraints) {
-              final badgeWidth = (constraints.maxWidth - 10) / 2;
-              return Wrap(
-                spacing: 10,
-                runSpacing: 10,
-                children: badges
-                    .map(
-                      (badge) => SizedBox(
-                    width: badgeWidth,
-                    child: _Badge(
-                      badge: badge,
-                      earned: reportCount >= badge.requiredReports,
-                    ),
-                  ),
-                )
-                    .toList(),
-              );
-            },
+          const SizedBox(height: 22),
+          _BadgeSection(
+            title: 'Connectivity Badges',
+            subtitle: 'Milestones from connectivity reports',
+            count: connectivityReports.length,
+            unit: 'connectivity reports',
+            badges: connectivityBadges,
           ),
           const SizedBox(height: 18),
           OutlinedButton.icon(
@@ -317,11 +263,138 @@ class _BadgeInfo {
   const _BadgeInfo(this.icon, this.name, this.requiredReports, this.color);
 }
 
+class _BadgeSection extends StatelessWidget {
+  const _BadgeSection({
+    required this.title,
+    required this.subtitle,
+    required this.count,
+    required this.unit,
+    required this.badges,
+  });
+
+  final String title;
+  final String subtitle;
+  final int count;
+  final String unit;
+  final List<_BadgeInfo> badges;
+
+  @override
+  Widget build(BuildContext context) {
+    final lockedBadges = badges.where(
+          (badge) => count < badge.requiredReports,
+    );
+    final nextBadge = lockedBadges.isEmpty ? null : lockedBadges.first;
+    final progress = nextBadge == null
+        ? 1.0
+        : (count / nextBadge.requiredReports).clamp(0.0, 1.0);
+    final progressColor = nextBadge?.color ?? safeTeal;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        PageTitle(title, subtitle),
+        const SizedBox(height: 8),
+        Card(
+          child: Padding(
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              children: [
+                Row(
+                  children: [
+                    CircleAvatar(
+                      radius: 20,
+                      backgroundColor: progressColor.withValues(alpha: .12),
+                      child: Icon(
+                        nextBadge?.icon ?? Icons.verified_rounded,
+                        color: progressColor,
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            nextBadge == null
+                                ? 'All badges unlocked!'
+                                : 'Next: ${nextBadge.name}',
+                            style: const TextStyle(
+                              fontWeight: FontWeight.w800,
+                              fontSize: 15,
+                            ),
+                          ),
+                          Text(
+                            nextBadge == null
+                                ? '$count $unit completed'
+                                : '$count / ${nextBadge.requiredReports} $unit',
+                            style: const TextStyle(
+                              color: mutedText,
+                              fontSize: 12,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    Text(
+                      '${(progress * 100).round()}%',
+                      style: TextStyle(
+                        color: progressColor,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 14),
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(99),
+                  child: LinearProgressIndicator(
+                    value: progress,
+                    minHeight: 9,
+                    backgroundColor: const Color(0xFFE8ECF4),
+                    color: progressColor,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+        const SizedBox(height: 10),
+        LayoutBuilder(
+          builder: (context, constraints) {
+            final badgeWidth = (constraints.maxWidth - 10) / 2;
+            return Wrap(
+              spacing: 10,
+              runSpacing: 10,
+              children: badges
+                  .map(
+                    (badge) => SizedBox(
+                  width: badgeWidth,
+                  child: _Badge(
+                    badge: badge,
+                    earned: count >= badge.requiredReports,
+                    unit: unit,
+                  ),
+                ),
+              )
+                  .toList(),
+            );
+          },
+        ),
+      ],
+    );
+  }
+}
+
 class _Badge extends StatelessWidget {
   final _BadgeInfo badge;
   final bool earned;
+  final String unit;
 
-  const _Badge({required this.badge, required this.earned});
+  const _Badge({
+    required this.badge,
+    required this.earned,
+    required this.unit,
+  });
 
   @override
   Widget build(BuildContext context) => Container(
@@ -367,7 +440,7 @@ class _Badge extends StatelessWidget {
               ),
               const SizedBox(height: 2),
               Text(
-                earned ? 'Unlocked' : '${badge.requiredReports} reports',
+                earned ? 'Unlocked' : '${badge.requiredReports} $unit',
                 style: TextStyle(
                   color: earned ? badge.color : mutedText,
                   fontSize: 10,
