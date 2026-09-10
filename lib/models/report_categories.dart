@@ -37,8 +37,10 @@ const _categoryLabelWeights = <String, Map<String, double>>{
     'hole': 2.6,
   },
   'Road Damage': {
+    'road surface': 3.7,
     'road crack': 3.6,
     'cracked road': 3.6,
+    'road damage': 3.6,
     'damaged road': 3.5,
     'broken pavement': 3.0,
     'asphalt': 1.8,
@@ -59,6 +61,8 @@ const _categoryLabelWeights = <String, Map<String, double>>{
     'signal': 1.5,
   },
   'Road Markings': {
+    'faded marking': 4.0,
+    'missing marking': 4.0,
     'road marking': 4.0,
     'lane marking': 3.8,
     'zebra crossing': 3.8,
@@ -78,6 +82,7 @@ const _categoryLabelWeights = <String, Map<String, double>>{
     'rain': 1.2,
   },
   'Drainage Issue': {
+    'blocked drainage': 4.2,
     'storm drain': 4.0,
     'blocked drain': 4.0,
     'drainage': 3.8,
@@ -90,6 +95,8 @@ const _categoryLabelWeights = <String, Map<String, double>>{
     'grate': 1.5,
   },
   'Road Obstruction': {
+    'road obstruction': 4.2,
+    'road blocked': 4.0,
     'blocked road': 4.0,
     'road block': 3.8,
     'obstruction': 3.8,
@@ -109,6 +116,8 @@ const _categoryLabelWeights = <String, Map<String, double>>{
     'tree': .5,
   },
   'Street Lighting': {
+    'broken street light': 4.5,
+    'street light not working': 4.5,
     'street light': 4.2,
     'streetlight': 4.2,
     'lamp post': 3.8,
@@ -135,6 +144,8 @@ const _categoryLabelWeights = <String, Map<String, double>>{
     'fence': .7,
   },
   'Bridge / Tunnel Damage': {
+    'bridge damage': 4.5,
+    'tunnel damage': 4.5,
     'damaged bridge': 4.5,
     'bridge crack': 4.2,
     'damaged tunnel': 4.5,
@@ -171,8 +182,9 @@ const _categoryLabelWeights = <String, Map<String, double>>{
 };
 
 ReportCategoryAnalysis analyseReportCategories(
-  Iterable<ReportImageLabel> labels,
-) {
+  Iterable<ReportImageLabel> labels, {
+  String contextText = '',
+}) {
   final scores = <String, double>{};
   final strongestWeights = <String, double>{};
   final strongestConfidences = <String, double>{};
@@ -201,6 +213,30 @@ ReportCategoryAnalysis analyseReportCategories(
               label.confidence > previousConfidence)) {
         strongestWeights[category] = strongestWeight;
         strongestConfidences[category] = label.confidence;
+      }
+    }
+  }
+
+  final context = contextText.trim().toLowerCase().replaceAll(
+    RegExp(r'[_-]+'),
+    ' ',
+  );
+  if (context.isNotEmpty) {
+    for (final category in reportCategories) {
+      final keywords = _categoryLabelWeights[category] ?? const {};
+      var strongestWeight = context.contains(category.toLowerCase())
+          ? 4.5
+          : 0.0;
+      for (final keyword in keywords.entries) {
+        if (context.contains(keyword.key) && keyword.value > strongestWeight) {
+          strongestWeight = keyword.value;
+        }
+      }
+      if (strongestWeight == 0) continue;
+      scores[category] = (scores[category] ?? 0) + strongestWeight * 1.4;
+      if (strongestWeight > (strongestWeights[category] ?? 0)) {
+        strongestWeights[category] = strongestWeight;
+        strongestConfidences[category] = .95;
       }
     }
   }

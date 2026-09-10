@@ -41,6 +41,9 @@ class _ReportFormScreenState extends State<ReportFormScreen> {
   bool _checkingDuplicates = false;
   String? _aiSuggestion;
   List<ReportCategorySuggestion> _aiCandidates = const [];
+  List<ReportImageLabel> _detectedImageLabels = const [];
+  Timer? _textAnalysisDebounce;
+  bool _categoryWasManuallySelected = false;
   String? _imageError;
   String? _locationMessage;
   int _analysisRun = 0;
@@ -62,6 +65,8 @@ class _ReportFormScreenState extends State<ReportFormScreen> {
   @override
   void initState() {
     super.initState();
+    _title.addListener(_scheduleTextAwareCategoryAnalysis);
+    _description.addListener(_scheduleTextAwareCategoryAnalysis);
     checkStatus();
   }
 
@@ -69,6 +74,7 @@ class _ReportFormScreenState extends State<ReportFormScreen> {
   void dispose() {
     _analysisRun++;
     _locationRun++;
+    _textAnalysisDebounce?.cancel();
     _title.dispose();
     _description.dispose();
     _locationName.dispose();
@@ -83,10 +89,12 @@ class _ReportFormScreenState extends State<ReportFormScreen> {
     if (picked == null) return;
     setState(() {
       _image = File(picked.path);
+      if (!_categoryWasManuallySelected) _category = '';
       _imageError = null;
       _analysingImage = true;
       _aiSuggestion = null;
       _aiCandidates = const [];
+      _detectedImageLabels = const [];
     });
     await _detectCategory(picked.path);
   }
@@ -102,6 +110,7 @@ class _ReportFormScreenState extends State<ReportFormScreen> {
         _analysisRun++;
         _analysingImage = false;
         _aiCandidates = const [];
+        _detectedImageLabels = const [];
         _aiSuggestion =
             'AI is taking too long. Detection stopped; select a category manually.';
       });
@@ -110,28 +119,20 @@ class _ReportFormScreenState extends State<ReportFormScreen> {
       final labels = await labeler.processImage(
         InputImage.fromFilePath(imagePath),
       );
-      final analysis = _categoryFromLabels(labels);
       if (!mounted || analysisRun != _analysisRun) return;
       setState(() {
         _analysingImage = false;
-        _aiCandidates = analysis.suggestions;
-        if (analysis.suggestions.isEmpty) {
-          _aiSuggestion = 'AI is unsure — please select a category';
-        } else if (analysis.canAutoSelect) {
-          final suggestion = analysis.suggestions.first;
-          _category = suggestion.category;
-          _aiCandidates = const [];
-          _aiSuggestion =
-              'AI suggested ${suggestion.category} · ${(suggestion.confidence * 100).round()}%';
-        } else {
-          _aiSuggestion = 'AI is unsure — choose the closest category below';
-        }
+        _detectedImageLabels = labels
+            .map((label) => (text: label.label, confidence: label.confidence))
+            .toList(growable: false);
       });
+      _updateCategorySuggestion(photoJustAnalysed: true);
     } catch (_) {
       if (mounted && analysisRun == _analysisRun) {
         setState(() {
           _analysingImage = false;
           _aiCandidates = const [];
+          _detectedImageLabels = const [];
           _aiSuggestion = 'AI analysis unavailable. Select manually.';
         });
       }
@@ -140,10 +141,54 @@ class _ReportFormScreenState extends State<ReportFormScreen> {
     }
   }
 
-  ReportCategoryAnalysis _categoryFromLabels(List<ImageLabel> labels) {
-    return analyseReportCategories(
-      labels.map((label) => (text: label.label, confidence: label.confidence)),
+  void _scheduleTextAwareCategoryAnalysis() {
+    if (_image == null || _analysingImage) return;
+    _textAnalysisDebounce?.cancel();
+    _textAnalysisDebounce = Timer(
+      const Duration(milliseconds: 350),
+      _updateCategorySuggestion,
     );
+  }
+
+  void _updateCategorySuggestion({bool photoJustAnalysed = false}) {
+    if (!mounted || _image == null || _analysingImage) return;
+    final contextText = '${_title.text} ${_description.text}'.trim();
+    final analysis = analyseReportCategories(
+      _detectedImageLabels,
+      contextText: contextText,
+    );
+    setState(() {
+      if (_categoryWasManuallySelected) {
+        _aiCandidates = const [];
+        if (analysis.suggestions.isNotEmpty &&
+            analysis.suggestions.first.category != _category) {
+          _aiSuggestion =
+              'AI suggests ${analysis.suggestions.first.category}; your selected category remains $_category';
+        }
+        return;
+      }
+
+      _aiCandidates = analysis.suggestions;
+      if (analysis.suggestions.isEmpty) {
+        _aiSuggestion = contextText.isEmpty
+            ? 'Photo analysed — add a short title for a more accurate category suggestion'
+            : 'Add more issue details or select a category manually';
+        return;
+      }
+
+      if (analysis.canAutoSelect) {
+        final suggestion = analysis.suggestions.first;
+        _category = suggestion.category;
+        _aiCandidates = const [];
+        _aiSuggestion =
+            'AI suggested ${suggestion.category} · ${(suggestion.confidence * 100).round()}%';
+        return;
+      }
+
+      _aiSuggestion = photoJustAnalysed && contextText.isEmpty
+          ? 'Possible categories found — add a title or choose below'
+          : 'Choose the closest suggested category below';
+    });
   }
 
   void _cancelImageAnalysis() {
@@ -152,6 +197,7 @@ class _ReportFormScreenState extends State<ReportFormScreen> {
       _analysisRun++;
       _analysingImage = false;
       _aiCandidates = const [];
+      _detectedImageLabels = const [];
       _aiSuggestion = 'AI detection cancelled. Select a category manually.';
     });
   }
@@ -449,6 +495,7 @@ class _ReportFormScreenState extends State<ReportFormScreen> {
     if (!mounted) return;
     await app.addReport(report);
     _key.currentState!.reset();
+    _textAnalysisDebounce?.cancel();
     _title.clear();
     _description.clear();
     setState(() {
@@ -456,7 +503,9 @@ class _ReportFormScreenState extends State<ReportFormScreen> {
       _imageError = null;
       _aiSuggestion = null;
       _aiCandidates = const [];
+      _detectedImageLabels = const [];
       _category = '';
+      _categoryWasManuallySelected = false;
       _analysingImage = false;
       _checkingDuplicates = false;
     });
@@ -688,6 +737,7 @@ class _ReportFormScreenState extends State<ReportFormScreen> {
                                     ),
                                     onPressed: () => setState(() {
                                       _category = suggestion.category;
+                                      _categoryWasManuallySelected = true;
                                       _aiSuggestion =
                                           'Selected ${suggestion.category} from AI suggestions';
                                       _aiCandidates = const [];
@@ -720,7 +770,15 @@ class _ReportFormScreenState extends State<ReportFormScreen> {
                   items: reportCategories
                       .map((v) => DropdownMenuItem(value: v, child: Text(v)))
                       .toList(),
-                  onChanged: (v) => setState(() => _category = v!),
+                  onChanged: (v) {
+                    if (v == null) return;
+                    setState(() {
+                      _category = v;
+                      _categoryWasManuallySelected = true;
+                      _aiCandidates = const [];
+                      _aiSuggestion = 'Category selected manually: $v';
+                    });
+                  },
                   validator: (value) => value == null || value.isEmpty
                       ? 'Please select a category'
                       : null,
