@@ -45,7 +45,7 @@ class DatabaseService {
     final directory = await getApplicationDocumentsDirectory();
     return openDatabase(
       '${directory.path}/safejalan.db',
-      version: 12,
+      version: 13,
       onCreate: (db, version) async {
         await _createReportsTable(db);
         await _createUserTables(db);
@@ -87,28 +87,32 @@ class DatabaseService {
         if (oldVersion < 10) await _migrateUserRemoteTracking(db);
         if (oldVersion < 11) await _createAnnouncementReadsTable(db);
         if (oldVersion < 12) {
-          await db.execute(
-            "ALTER TABLE Reports ADD COLUMN afterImagePath TEXT",
-          );
-          await db.execute(
-            "ALTER TABLE Reports ADD COLUMN responsibleAgency TEXT NOT NULL DEFAULT ''",
-          );
-          await db.execute(
-            "ALTER TABLE Reports ADD COLUMN scheduledRepairDate TEXT NOT NULL DEFAULT ''",
-          );
-          await db.execute(
-            "ALTER TABLE Reports ADD COLUMN adminNote TEXT NOT NULL DEFAULT ''",
-          );
-          await db.execute(
-            "ALTER TABLE Reports ADD COLUMN completionNote TEXT NOT NULL DEFAULT ''",
-          );
-          await db.execute(
-            "ALTER TABLE Reports ADD COLUMN resolvedBy TEXT NOT NULL DEFAULT ''",
-          );
           await _createUserNotificationsTable(db);
         }
+        if (oldVersion < 13) await _addReportMaintenanceColumns(db);
       },
     );
+  }
+
+  Future<void> _addReportMaintenanceColumns(Database db) async {
+    final columns = (await db.rawQuery(
+      'PRAGMA table_info(Reports)',
+    )).map((row) => row['name'] as String).toSet();
+    const definitions = {
+      'afterImagePath': 'TEXT',
+      'responsibleAgency': "TEXT NOT NULL DEFAULT ''",
+      'scheduledRepairDate': "TEXT NOT NULL DEFAULT ''",
+      'adminNote': "TEXT NOT NULL DEFAULT ''",
+      'completionNote': "TEXT NOT NULL DEFAULT ''",
+      'resolvedBy': "TEXT NOT NULL DEFAULT ''",
+    };
+    for (final entry in definitions.entries) {
+      if (!columns.contains(entry.key)) {
+        await db.execute(
+          'ALTER TABLE Reports ADD COLUMN ${entry.key} ${entry.value}',
+        );
+      }
+    }
   }
 
   Future<void> _createVerificationTable(Database db) async {
@@ -768,6 +772,12 @@ class DatabaseService {
         longitude REAL NOT NULL,
         status TEXT NOT NULL,
         imagePath TEXT,
+        afterImagePath TEXT,
+        responsibleAgency TEXT NOT NULL DEFAULT '',
+        scheduledRepairDate TEXT NOT NULL DEFAULT '',
+        adminNote TEXT NOT NULL DEFAULT '',
+        completionNote TEXT NOT NULL DEFAULT '',
+        resolvedBy TEXT NOT NULL DEFAULT '',
         votes INTEGER NOT NULL,
         createdOn TEXT NOT NULL,
         updatedAt TEXT NOT NULL,

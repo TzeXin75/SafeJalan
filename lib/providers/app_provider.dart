@@ -611,6 +611,33 @@ class AppProvider extends ChangeNotifier {
     notifyListeners();
   }
 
+  Future<int> syncReportsFromSupabase() async {
+    if (!_reportsRepository.isRemoteConfigured) {
+      lastSyncError =
+          _supabase.initialisationError ?? 'Supabase is not configured.';
+      notifyListeners();
+      return 0;
+    }
+    if (isSyncing) return 0;
+
+    isSyncing = true;
+    notifyListeners();
+    try {
+      final downloaded = await _reportsRepository.downloadReportsFromRemote();
+      reports = await _reportsRepository.getLocalReports();
+      await archiveExpiredResolvedReports();
+      lastSyncError = null;
+      return downloaded;
+    } catch (error) {
+      lastSyncError = 'Report download failed: $error';
+      debugPrint('[SafeJalan sync] $lastSyncError');
+      return 0;
+    } finally {
+      isSyncing = false;
+      notifyListeners();
+    }
+  }
+
   Future<void> _syncAllUsers() async {
     if (!_supabase.isConfigured) return;
     const legacyAdminEmail = 'admin@safejalan.my';

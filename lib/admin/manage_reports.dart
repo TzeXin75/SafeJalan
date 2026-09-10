@@ -15,14 +15,16 @@ class ManageReportsScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final app = context.watch<AppProvider>();
-    final reports = statusFilter == null
-        ? app.adminVisibleReports
-        : app.adminVisibleReports
-              .where(
-                (report) =>
-                    report.status.toLowerCase() == statusFilter!.toLowerCase(),
-              )
-              .toList();
+    final reports =
+        (statusFilter == null
+                ? app.adminVisibleReports
+                : app.adminVisibleReports.where(
+                    (report) =>
+                        report.status.toLowerCase() ==
+                        statusFilter!.toLowerCase(),
+                  ))
+            .toList()
+          ..sort(_compareReportPriority);
     return SafeArea(
       child: Column(
         children: [
@@ -31,14 +33,24 @@ class ManageReportsScreen extends StatelessWidget {
             child: Row(
               children: [
                 Expanded(
-                  child: Text(
-                    statusFilter == null
-                        ? 'Manage Reports (${reports.length})'
-                        : '$statusFilter Reports (${reports.length})',
-                    style: const TextStyle(
-                      fontSize: 24,
-                      fontWeight: FontWeight.bold,
-                    ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        statusFilter == null
+                            ? 'Manage Reports (${reports.length})'
+                            : '$statusFilter Reports (${reports.length})',
+                        style: const TextStyle(
+                          fontSize: 24,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      const SizedBox(height: 3),
+                      const Text(
+                        'Priority: Critical  ·  High  ·  Medium  ·  Low',
+                        style: TextStyle(color: mutedText, fontSize: 12),
+                      ),
+                    ],
                   ),
                 ),
                 if (statusFilter != null)
@@ -89,6 +101,52 @@ class ManageReportsScreen extends StatelessWidget {
   }
 }
 
+int _compareReportPriority(RoadReport first, RoadReport second) {
+  final completionComparison = _completionRank(
+    first.status,
+  ).compareTo(_completionRank(second.status));
+  if (completionComparison != 0) return completionComparison;
+
+  final severityComparison = _severityRank(
+    first.severity,
+  ).compareTo(_severityRank(second.severity));
+  if (severityComparison != 0) return severityComparison;
+
+  final statusComparison = _statusRank(
+    first.status,
+  ).compareTo(_statusRank(second.status));
+  if (statusComparison != 0) return statusComparison;
+
+  return _reportDate(second).compareTo(_reportDate(first));
+}
+
+int _completionRank(String status) => switch (status.toLowerCase()) {
+  'resolved' || 'rejected' => 1,
+  _ => 0,
+};
+
+int _severityRank(String severity) => switch (severity.toLowerCase()) {
+  'critical' => 0,
+  'high' => 1,
+  'medium' => 2,
+  'low' => 3,
+  _ => 4,
+};
+
+int _statusRank(String status) => switch (status.toLowerCase()) {
+  'pending' => 0,
+  'reviewed' => 1,
+  'in progress' => 2,
+  'resolved' => 3,
+  'rejected' => 4,
+  _ => 5,
+};
+
+DateTime _reportDate(RoadReport report) =>
+    DateTime.tryParse(report.createdOn) ??
+    DateTime.tryParse(report.updatedAt) ??
+    DateTime.fromMillisecondsSinceEpoch(0);
+
 class _AdminReportCard extends StatelessWidget {
   const _AdminReportCard({
     required this.report,
@@ -129,14 +187,29 @@ class _AdminReportCard extends StatelessWidget {
         : isRejected
         ? Colors.red
         : primary;
+    final priorityColor = severityColor(report.severity);
 
     return Card(
       margin: const EdgeInsets.only(bottom: 14),
+      color: Color.alphaBlend(
+        priorityColor.withValues(alpha: .035),
+        Colors.white,
+      ),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(18),
+        side: BorderSide(
+          color: priorityColor.withValues(alpha: .34),
+          width: 1.2,
+        ),
+      ),
       clipBehavior: Clip.antiAlias,
       child: InkWell(
         onTap: onOpen,
-        child: Padding(
+        child: Container(
           padding: const EdgeInsets.all(14),
+          decoration: BoxDecoration(
+            border: Border(left: BorderSide(color: priorityColor, width: 5)),
+          ),
           child: Column(
             children: [
               Row(
@@ -171,9 +244,9 @@ class _AdminReportCard extends StatelessWidget {
                           spacing: 6,
                           runSpacing: 6,
                           children: [
-                            LabelBadge(
-                              report.severity,
-                              severityColor(report.severity),
+                            _PriorityBadge(
+                              label: report.severity,
+                              color: priorityColor,
                             ),
                             LabelBadge(
                               report.status,
@@ -216,7 +289,7 @@ class _AdminReportCard extends StatelessWidget {
                         ),
                         const SizedBox(height: 5),
                         Text(
-                          '${report.votes} verifications',
+                          '${report.category}  ·  ${report.votes} verifications',
                           style: const TextStyle(
                             color: mutedText,
                             fontSize: 11,
@@ -316,4 +389,35 @@ class _AdminReportCard extends StatelessWidget {
     );
     if (confirmed == true) onDelete();
   }
+}
+
+class _PriorityBadge extends StatelessWidget {
+  const _PriorityBadge({required this.label, required this.color});
+
+  final String label;
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) => Container(
+    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+    decoration: BoxDecoration(
+      color: color,
+      borderRadius: BorderRadius.circular(999),
+      boxShadow: [
+        BoxShadow(
+          color: color.withValues(alpha: .24),
+          blurRadius: 6,
+          offset: const Offset(0, 2),
+        ),
+      ],
+    ),
+    child: Text(
+      label,
+      style: TextStyle(
+        color: label.toLowerCase() == 'medium' ? navy : Colors.white,
+        fontSize: 11,
+        fontWeight: FontWeight.w800,
+      ),
+    ),
+  );
 }

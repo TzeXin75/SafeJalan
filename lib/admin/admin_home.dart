@@ -32,6 +32,7 @@ class _AdminHomeState extends State<AdminHome> {
     if (!app.isLoggedIn || !app.isAdmin) return const EntryScreen();
     return Scaffold(
       appBar: AppBar(
+        automaticallyImplyLeading: false,
         toolbarHeight: 68,
         titleSpacing: 16,
         title: const Row(

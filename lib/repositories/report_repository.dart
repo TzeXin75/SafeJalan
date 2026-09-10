@@ -89,30 +89,41 @@ class ReportRepository {
         }
       }
 
-      final remoteReports = await _remote.getReports();
-      final localReports = await _local.getReports();
-      final remoteIds = <String>{};
-      for (final report in remoteReports) {
-        remoteIds.add(report.remoteId!);
-        if (report.imagePath == null) {
-          final matchingLocal = localReports.where(
-            (local) => local.remoteId == report.remoteId,
-          );
-          if (matchingLocal.isNotEmpty) {
-            final local = matchingLocal.first;
-            if (local.imagePath?.isNotEmpty == true &&
-                !local.imagePath!.startsWith('http')) {
-              await _remote.syncReportImage(local);
-            }
-          }
-        }
-        await _local.upsertRemoteReport(report);
-      }
-      await _local.deleteSyncedReportsMissingFromRemote(remoteIds);
+      await downloadReportsFromRemote();
       return const SyncResult(remoteEnabled: true);
     } catch (error) {
       return SyncResult(remoteEnabled: true, error: error.toString());
     }
+  }
+
+  Future<int> downloadReportsFromRemote() async {
+    if (!_remote.isConfigured) {
+      throw StateError('Supabase is not configured.');
+    }
+
+    final remoteReports = await _remote.getReports();
+    final localReports = await _local.getReports();
+    final remoteIds = <String>{};
+    for (final report in remoteReports) {
+      final remoteId = report.remoteId;
+      if (remoteId == null) continue;
+      remoteIds.add(remoteId);
+      if (report.imagePath == null) {
+        final matchingLocal = localReports.where(
+          (local) => local.remoteId == remoteId,
+        );
+        if (matchingLocal.isNotEmpty) {
+          final local = matchingLocal.first;
+          if (local.imagePath?.isNotEmpty == true &&
+              !local.imagePath!.startsWith('http')) {
+            await _remote.syncReportImage(local);
+          }
+        }
+      }
+      await _local.upsertRemoteReport(report);
+    }
+    await _local.deleteSyncedReportsMissingFromRemote(remoteIds);
+    return remoteReports.length;
   }
 
   Future<void> _tryUpload(RoadReport report) async {
