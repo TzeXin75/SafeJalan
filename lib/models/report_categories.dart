@@ -183,7 +183,8 @@ const _categoryLabelWeights = <String, Map<String, double>>{
 
 ReportCategoryAnalysis analyseReportCategories(
   Iterable<ReportImageLabel> labels, {
-  String contextText = '',
+  String titleText = '',
+  String descriptionText = '',
 }) {
   final scores = <String, double>{};
   final strongestWeights = <String, double>{};
@@ -204,8 +205,9 @@ ReportCategoryAnalysis analyseReportCategories(
         }
       }
       if (strongestWeight == 0) continue;
+      // The photo is the primary source of evidence.
       scores[category] =
-          (scores[category] ?? 0) + label.confidence * strongestWeight;
+          (scores[category] ?? 0) + label.confidence * strongestWeight * 1.25;
       final previousWeight = strongestWeights[category] ?? 0;
       final previousConfidence = strongestConfidences[category] ?? 0;
       if (strongestWeight > previousWeight ||
@@ -217,23 +219,19 @@ ReportCategoryAnalysis analyseReportCategories(
     }
   }
 
-  final context = contextText.trim().toLowerCase().replaceAll(
-    RegExp(r'[_-]+'),
-    ' ',
-  );
-  if (context.isNotEmpty) {
+  void addTextEvidence(String value, double multiplier) {
+    final text = value.trim().toLowerCase().replaceAll(RegExp(r'[_-]+'), ' ');
+    if (text.isEmpty) return;
     for (final category in reportCategories) {
       final keywords = _categoryLabelWeights[category] ?? const {};
-      var strongestWeight = context.contains(category.toLowerCase())
-          ? 4.5
-          : 0.0;
+      var strongestWeight = text.contains(category.toLowerCase()) ? 4.5 : 0.0;
       for (final keyword in keywords.entries) {
-        if (context.contains(keyword.key) && keyword.value > strongestWeight) {
+        if (text.contains(keyword.key) && keyword.value > strongestWeight) {
           strongestWeight = keyword.value;
         }
       }
       if (strongestWeight == 0) continue;
-      scores[category] = (scores[category] ?? 0) + strongestWeight * 1.4;
+      scores[category] = (scores[category] ?? 0) + strongestWeight * multiplier;
       if (strongestWeight > (strongestWeights[category] ?? 0)) {
         strongestWeights[category] = strongestWeight;
         strongestConfidences[category] = .95;
@@ -241,12 +239,25 @@ ReportCategoryAnalysis analyseReportCategories(
     }
   }
 
-  final ranked = <({String category, double score, double confidence})>[];
+  // A short title normally describes the issue more directly than the longer
+  // description, so it receives the stronger supporting weight.
+  addTextEvidence(titleText, 1.15);
+  addTextEvidence(descriptionText, .75);
+
+  final ranked =
+      <
+        ({
+          String category,
+          double score,
+          double confidence,
+          bool hasStrongEvidence,
+        })
+      >[];
   for (final category in reportCategories) {
     final score = scores[category] ?? 0;
     final strongestWeight = strongestWeights[category] ?? 0;
     final strongestConfidence = strongestConfidences[category] ?? 0;
-    if (score < .8 || strongestWeight < 2.4 || strongestConfidence < .45) {
+    if (score < .45 || strongestWeight < 1.5 || strongestConfidence < .45) {
       continue;
     }
     final evidence = (score / 4).clamp(0.0, 1.0);
@@ -256,7 +267,13 @@ ReportCategoryAnalysis analyseReportCategories(
           0.0,
           .99,
         );
-    ranked.add((category: category, score: score, confidence: confidence));
+    final hasStrongEvidence = strongestWeight >= 2.4;
+    ranked.add((
+      category: category,
+      score: score,
+      confidence: hasStrongEvidence ? confidence : confidence.clamp(0.0, .64),
+      hasStrongEvidence: hasStrongEvidence,
+    ));
   }
   ranked.sort((first, second) => second.score.compareTo(first.score));
 
@@ -273,7 +290,8 @@ ReportCategoryAnalysis analyseReportCategories(
       .toList(growable: false);
   return ReportCategoryAnalysis(
     suggestions: suggestions,
-    canAutoSelect: top.confidence >= .68 && hasClearLead,
+    canAutoSelect:
+        top.hasStrongEvidence && top.confidence >= .68 && hasClearLead,
   );
 }
 

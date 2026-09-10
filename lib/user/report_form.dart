@@ -126,7 +126,7 @@ class _ReportFormScreenState extends State<ReportFormScreen> {
             .map((label) => (text: label.label, confidence: label.confidence))
             .toList(growable: false);
       });
-      _updateCategorySuggestion(photoJustAnalysed: true);
+      _updateCategorySuggestion();
     } catch (_) {
       if (mounted && analysisRun == _analysisRun) {
         setState(() {
@@ -150,12 +150,15 @@ class _ReportFormScreenState extends State<ReportFormScreen> {
     );
   }
 
-  void _updateCategorySuggestion({bool photoJustAnalysed = false}) {
+  void _updateCategorySuggestion() {
     if (!mounted || _image == null || _analysingImage) return;
-    final contextText = '${_title.text} ${_description.text}'.trim();
+    final titleText = _title.text.trim();
+    final descriptionText = _description.text.trim();
+    final hasTextContext = titleText.isNotEmpty || descriptionText.isNotEmpty;
     final analysis = analyseReportCategories(
       _detectedImageLabels,
-      contextText: contextText,
+      titleText: titleText,
+      descriptionText: descriptionText,
     );
     setState(() {
       if (_categoryWasManuallySelected) {
@@ -170,13 +173,16 @@ class _ReportFormScreenState extends State<ReportFormScreen> {
 
       _aiCandidates = analysis.suggestions;
       if (analysis.suggestions.isEmpty) {
-        _aiSuggestion = contextText.isEmpty
+        _aiSuggestion = !hasTextContext
             ? 'Photo analysed — add a short title for a more accurate category suggestion'
             : 'Add more issue details or select a category manually';
         return;
       }
 
-      if (analysis.canAutoSelect) {
+      // The photo produces the initial candidates. Final automatic selection
+      // waits for at least one piece of text so the title or description can
+      // confirm or correct the visual result.
+      if (hasTextContext && analysis.canAutoSelect) {
         final suggestion = analysis.suggestions.first;
         _category = suggestion.category;
         _aiCandidates = const [];
@@ -185,8 +191,8 @@ class _ReportFormScreenState extends State<ReportFormScreen> {
         return;
       }
 
-      _aiSuggestion = photoJustAnalysed && contextText.isEmpty
-          ? 'Possible categories found — add a title or choose below'
+      _aiSuggestion = !hasTextContext
+          ? 'Photo suggests possible categories — add a title or choose below'
           : 'Choose the closest suggested category below';
     });
   }
@@ -614,7 +620,7 @@ class _ReportFormScreenState extends State<ReportFormScreen> {
           padding: const EdgeInsets.all(16),
           width: double.infinity,
           child: const Text(
-            'Report Road Damage',
+            'Report',
             style: TextStyle(
               color: Colors.white,
               fontSize: 20,
