@@ -5,6 +5,7 @@ import 'package:safejalan/models/safety_announcement.dart';
 import 'package:safejalan/models/user_notification.dart';
 import 'package:safejalan/providers/app_provider.dart';
 import 'package:safejalan/user/announcement_detail.dart';
+import 'package:safejalan/user/connectivity_detail.dart';
 import 'package:safejalan/user/report_detail.dart';
 import 'package:safejalan/widgets/common.dart';
 
@@ -62,10 +63,10 @@ class _PersonalNotifications extends StatelessWidget {
             trailing: app.unreadUserNotifications.isEmpty
                 ? null
                 : TextButton.icon(
-                    onPressed: app.markAllUserNotificationsRead,
-                    icon: const Icon(Icons.done_all_rounded),
-                    label: const Text('Read all'),
-                  ),
+              onPressed: app.markAllUserNotificationsRead,
+              icon: const Icon(Icons.done_all_rounded),
+              label: const Text('Read all'),
+            ),
           ),
           const SizedBox(height: 10),
           if (items.isEmpty)
@@ -94,6 +95,9 @@ class _PersonalNotificationCard extends StatelessWidget {
   final UserNotificationItem item;
 
   IconData get _icon => switch (item.type) {
+    'connectivity_reviewed' => Icons.fact_check_outlined,
+    'connectivity_resolved' => Icons.wifi_rounded,
+    'connectivity_pending' => Icons.wifi_find_rounded,
     'in_progress' => Icons.build_circle_outlined,
     'resolved' => Icons.check_circle_outline_rounded,
     'rejected' => Icons.cancel_outlined,
@@ -101,6 +105,9 @@ class _PersonalNotificationCard extends StatelessWidget {
   };
 
   Color get _color => switch (item.type) {
+    'connectivity_reviewed' => primary,
+    'connectivity_resolved' => safeTeal,
+    'connectivity_pending' => safeOrange,
     'in_progress' => primary,
     'resolved' => safeTeal,
     'rejected' => Colors.red,
@@ -116,8 +123,21 @@ class _PersonalNotificationCard extends StatelessWidget {
       onTap: () async {
         final app = context.read<AppProvider>();
         await app.markUserNotificationRead(item);
+        if (item.type.startsWith('connectivity_')) {
+          final matching = app.connectivityReports.where(
+                (report) => report.remoteId == item.reportRemoteId,
+          );
+          if (!context.mounted || matching.isEmpty) return;
+          await Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (_) => ConnectivityDetailScreen(report: matching.first),
+            ),
+          );
+          return;
+        }
         final matching = app.reports.where(
-          (report) => report.remoteId == item.reportRemoteId,
+              (report) => report.remoteId == item.reportRemoteId,
         );
         if (!context.mounted || matching.isEmpty) return;
         await Navigator.push(
@@ -198,7 +218,7 @@ class _AnnouncementNotifications extends StatelessWidget {
     final app = context.watch<AppProvider>();
     final provider = context.read<AppProvider>();
     final unreadNonEmergency = app.unreadAnnouncements.where(
-      (item) => item.priority.toLowerCase() != 'emergency',
+          (item) => item.priority.toLowerCase() != 'emergency',
     );
     return RefreshIndicator(
       onRefresh: () async {
@@ -215,10 +235,10 @@ class _AnnouncementNotifications extends StatelessWidget {
             trailing: unreadNonEmergency.isEmpty
                 ? null
                 : TextButton.icon(
-                    onPressed: app.markAllNonEmergencyAnnouncementsRead,
-                    icon: const Icon(Icons.done_all_rounded),
-                    label: const Text('Read all'),
-                  ),
+              onPressed: app.markAllNonEmergencyAnnouncementsRead,
+              icon: const Icon(Icons.done_all_rounded),
+              label: const Text('Read all'),
+            ),
           ),
           const SizedBox(height: 10),
           if (app.activeAnnouncements.isEmpty)
@@ -229,7 +249,7 @@ class _AnnouncementNotifications extends StatelessWidget {
               ),
             ),
           ...app.activeAnnouncements.map(
-            (item) => _AnnouncementCard(
+                (item) => _AnnouncementCard(
               item: item,
               isRead: app.isAnnouncementRead(item),
             ),

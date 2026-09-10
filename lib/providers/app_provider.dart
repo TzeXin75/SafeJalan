@@ -926,18 +926,67 @@ class AppProvider extends ChangeNotifier {
       ConnectivityReport report,
       String status,
       ) async {
-    await _database.updateConnectivityReport(
-      report.copyWith(
-        status: status,
-        updatedAt: DateTime.now().toUtc().toIso8601String(),
-        syncStatus: 'pending',
-      ),
+    final updated = report.copyWith(
+      status: status,
+      updatedAt: DateTime.now().toUtc().toIso8601String(),
+      syncStatus: 'pending',
     );
+    await _database.updateConnectivityReport(
+      updated,
+    );
+    await _createConnectivityStatusNotification(report, updated);
     connectivityReports = await _database.getConnectivityReports();
     notifyListeners();
     await syncConnectivityReports();
-    final updated = connectivityReports.where((item) => item.id == report.id);
-    return updated.isNotEmpty && updated.first.syncStatus == 'synced';
+    unawaited(syncUserNotifications());
+    final matches = connectivityReports.where((item) => item.id == report.id);
+    return matches.isNotEmpty && matches.first.syncStatus == 'synced';
+  }
+
+  Future<void> _createConnectivityStatusNotification(
+      ConnectivityReport previous,
+      ConnectivityReport updated,
+      ) async {
+    if (previous.status.toLowerCase() == updated.status.toLowerCase() ||
+        updated.reporterEmail.isEmpty) {
+      return;
+    }
+    final copy = switch (updated.status.toLowerCase()) {
+      'reviewed' => (
+      'Connectivity report reviewed',
+      'Admin reviewed your ${updated.issueType} report at ${updated.area}.',
+      'connectivity_reviewed',
+      ),
+      'resolved' => (
+      'Connectivity issue resolved',
+      'Your ${updated.issueType} report at ${updated.area} was marked Resolved.',
+      'connectivity_resolved',
+      ),
+      'pending' => (
+      'Connectivity report pending',
+      'Your ${updated.issueType} report at ${updated.area} was returned to Pending.',
+      'connectivity_pending',
+      ),
+      _ => null,
+    };
+    if (copy == null) return;
+    final now = DateTime.now().toUtc().toIso8601String();
+    await _database.insertUserNotification(
+      UserNotificationItem(
+        remoteId: _uuid.v4(),
+        eventKey:
+        'connectivity|${updated.remoteId}|${updated.status.toLowerCase()}|$now',
+        userEmail: updated.reporterEmail,
+        reportRemoteId: updated.remoteId,
+        title: copy.$1,
+        message: copy.$2,
+        type: copy.$3,
+        createdAt: now,
+      ),
+    );
+    if (updated.reporterEmail.toLowerCase() == email.toLowerCase()) {
+      await _loadUserNotifications();
+    }
   }
 
   Future<void> deleteConnectivityReport(ConnectivityReport report) async {
