@@ -6,7 +6,10 @@ import 'package:safejalan/widgets/common.dart';
 import 'package:safejalan/admin/report_detail.dart';
 
 class DashboardScreen extends StatelessWidget {
-  const DashboardScreen({super.key});
+  const DashboardScreen({super.key, required this.onNavigate});
+
+  final void Function(int index, String? reportStatus) onNavigate;
+
   @override
   Widget build(BuildContext context) {
     final reports = context.watch<AppProvider>().adminVisibleReports;
@@ -35,6 +38,7 @@ class DashboardScreen extends StatelessWidget {
                   '${snapshot.data ?? 0}',
                   'Total Users',
                   primary,
+                  onTap: () => onNavigate(1, null),
                 ),
               ),
               _Kpi(
@@ -42,9 +46,22 @@ class DashboardScreen extends StatelessWidget {
                 '${reports.length}',
                 'Total Reports',
                 Colors.orange,
+                onTap: () => onNavigate(2, null),
               ),
-              _Kpi(Icons.check_circle, '$resolved', 'Resolved', Colors.green),
-              _Kpi(Icons.pending_actions, '$pending', 'Pending', Colors.red),
+              _Kpi(
+                Icons.check_circle,
+                '$resolved',
+                'Resolved',
+                Colors.green,
+                onTap: () => onNavigate(2, 'Resolved'),
+              ),
+              _Kpi(
+                Icons.pending_actions,
+                '$pending',
+                'Pending',
+                Colors.red,
+                onTap: () => onNavigate(2, 'Pending'),
+              ),
             ],
           ),
           const SizedBox(height: 20),
@@ -107,31 +124,63 @@ class _Kpi extends StatelessWidget {
   final IconData icon;
   final String value, label;
   final Color color;
-  const _Kpi(this.icon, this.value, this.label, this.color);
+  final VoidCallback onTap;
+  const _Kpi(
+    this.icon,
+    this.value,
+    this.label,
+    this.color, {
+    required this.onTap,
+  });
+
   @override
-  Widget build(BuildContext context) => Card(
-    child: Padding(
-      padding: const EdgeInsets.all(14),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Container(
-            width: 36,
-            height: 36,
-            decoration: BoxDecoration(
-              color: color.withValues(alpha: .1),
-              borderRadius: BorderRadius.circular(11),
-            ),
-            child: Icon(icon, color: color, size: 20),
+  Widget build(BuildContext context) => Semantics(
+    button: true,
+    label: 'Open $label management',
+    child: Card(
+      clipBehavior: Clip.antiAlias,
+      child: InkWell(
+        onTap: onTap,
+        child: Padding(
+          padding: const EdgeInsets.all(14),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Row(
+                children: [
+                  Container(
+                    width: 36,
+                    height: 36,
+                    decoration: BoxDecoration(
+                      color: color.withValues(alpha: .1),
+                      borderRadius: BorderRadius.circular(11),
+                    ),
+                    child: Icon(icon, color: color, size: 20),
+                  ),
+                  const Spacer(),
+                  const Icon(
+                    Icons.arrow_forward_ios_rounded,
+                    size: 13,
+                    color: mutedText,
+                  ),
+                ],
+              ),
+              const Spacer(),
+              Text(
+                value,
+                style: const TextStyle(
+                  fontSize: 22,
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+              Text(
+                label,
+                style: const TextStyle(fontSize: 11, color: mutedText),
+              ),
+            ],
           ),
-          const Spacer(),
-          Text(
-            value,
-            style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w800),
-          ),
-          Text(label, style: const TextStyle(fontSize: 11, color: mutedText)),
-        ],
+        ),
       ),
     ),
   );

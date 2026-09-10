@@ -17,13 +17,15 @@ class AdminHome extends StatefulWidget {
 
 class _AdminHomeState extends State<AdminHome> {
   int _index = 0;
-  final _pages = const [
-    DashboardScreen(),
-    ManageUsersScreen(),
-    ManageReportsScreen(),
-    ManageConnectivityScreen(),
-    AdminToolsScreen(),
-  ];
+  String? _reportStatusFilter;
+
+  void _selectSection(int index, String? reportStatus) {
+    setState(() {
+      _index = index;
+      _reportStatusFilter = reportStatus;
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
     final app = context.watch<AppProvider>();
@@ -68,7 +70,19 @@ class _AdminHomeState extends State<AdminHome> {
           ),
         ],
       ),
-      body: IndexedStack(index: _index, children: _pages),
+      body: IndexedStack(
+        index: _index,
+        children: [
+          DashboardScreen(onNavigate: _selectSection),
+          const ManageUsersScreen(),
+          ManageReportsScreen(
+            statusFilter: _reportStatusFilter,
+            onShowAll: () => _selectSection(2, null),
+          ),
+          const ManageConnectivityScreen(),
+          const AdminToolsScreen(),
+        ],
+      ),
       bottomNavigationBar: DecoratedBox(
         decoration: const BoxDecoration(
           boxShadow: [
@@ -82,7 +96,7 @@ class _AdminHomeState extends State<AdminHome> {
         child: NavigationBar(
           selectedIndex: _index,
           indicatorColor: safeOrange.withValues(alpha: .18),
-          onDestinationSelected: (i) => setState(() => _index = i),
+          onDestinationSelected: (i) => _selectSection(i, null),
           destinations: const [
             NavigationDestination(
               icon: Icon(Icons.dashboard_outlined),

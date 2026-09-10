@@ -7,25 +7,47 @@ import 'package:safejalan/models/report.dart';
 import 'package:safejalan/widgets/stored_image.dart';
 
 class ManageReportsScreen extends StatelessWidget {
-  const ManageReportsScreen({super.key});
+  const ManageReportsScreen({super.key, this.statusFilter, this.onShowAll});
+
+  final String? statusFilter;
+  final VoidCallback? onShowAll;
+
   @override
   Widget build(BuildContext context) {
     final app = context.watch<AppProvider>();
-    final reports = app.adminVisibleReports;
+    final reports = statusFilter == null
+        ? app.adminVisibleReports
+        : app.adminVisibleReports
+              .where(
+                (report) =>
+                    report.status.toLowerCase() == statusFilter!.toLowerCase(),
+              )
+              .toList();
     return SafeArea(
       child: Column(
         children: [
           Padding(
             padding: const EdgeInsets.all(16),
-            child: Align(
-              alignment: Alignment.centerLeft,
-              child: Text(
-                'Manage Reports (${reports.length})',
-                style: const TextStyle(
-                  fontSize: 24,
-                  fontWeight: FontWeight.bold,
+            child: Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    statusFilter == null
+                        ? 'Manage Reports (${reports.length})'
+                        : '$statusFilter Reports (${reports.length})',
+                    style: const TextStyle(
+                      fontSize: 24,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
                 ),
-              ),
+                if (statusFilter != null)
+                  TextButton.icon(
+                    onPressed: onShowAll,
+                    icon: const Icon(Icons.close, size: 18),
+                    label: const Text('Show all'),
+                  ),
+              ],
             ),
           ),
           Expanded(
