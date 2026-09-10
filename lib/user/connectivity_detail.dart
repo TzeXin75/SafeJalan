@@ -104,6 +104,8 @@ class ConnectivityDetailScreen extends StatelessWidget {
       carrier: input.carrier,
       notes: input.notes,
       area: input.area,
+      latitude: input.latitude,
+      longitude: input.longitude,
     );
     if (context.mounted && error != null) {
       ScaffoldMessenger.of(
@@ -350,12 +352,16 @@ class _ConnectivityInput {
     required this.carrier,
     required this.notes,
     required this.area,
+    required this.latitude,
+    required this.longitude,
   });
 
   final String issueType;
   final String carrier;
   final String notes;
   final String area;
+  final double latitude;
+  final double longitude;
 }
 
 class _ConnectivityEditDialog extends StatefulWidget {
@@ -455,6 +461,8 @@ class _ConnectivityEditDialogState extends State<_ConnectivityEditDialog> {
   Future<void> _confirmAndSave() async {
     if (!_key.currentState!.validate()) return;
     var confirmedArea = _area.text.trim();
+    var confirmedLatitude = widget.report.latitude;
+    var confirmedLongitude = widget.report.longitude;
 
     if (confirmedArea != widget.report.area.trim()) {
       setState(() => _checkingArea = true);
@@ -468,6 +476,8 @@ class _ConnectivityEditDialogState extends State<_ConnectivityEditDialog> {
           return;
         }
         final location = locations.first;
+        confirmedLatitude = location.latitude;
+        confirmedLongitude = location.longitude;
         final places = await geo.placemarkFromCoordinates(
           location.latitude,
           location.longitude,
@@ -528,6 +538,8 @@ class _ConnectivityEditDialogState extends State<_ConnectivityEditDialog> {
         carrier: _carrier.text.trim(),
         notes: _notes.text.trim(),
         area: confirmedArea,
+        latitude: confirmedLatitude,
+        longitude: confirmedLongitude,
       ),
     );
   }

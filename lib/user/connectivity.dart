@@ -25,8 +25,6 @@ class _ConnectivityScreenState extends State<ConnectivityScreen> {
   String _type = 'Poor Signal';
   bool _saving = false;
   bool _locating = false;
-  bool _checkingArea = false;
-  bool _locationConfirmed = false;
   bool _permissionGranted = false;
   bool _gpsEnabled = false;
   String? _locationMessage;
@@ -143,10 +141,9 @@ class _ConnectivityScreenState extends State<ConnectivityScreen> {
 
       await _updateAreaName(_latitude!, _longitude!);
       if (mounted && locationRun == _locationRun) {
-        setState(() {
-          _locationConfirmed = true;
-          _locationMessage = 'Current location detected and confirmed.';
-        });
+        setState(
+              () => _locationMessage = 'Current location detected and confirmed.',
+        );
       }
     } on TimeoutException {
       if (mounted && locationRun == _locationRun) {
@@ -207,6 +204,46 @@ class _ConnectivityScreenState extends State<ConnectivityScreen> {
 
   Future<void> _chooseLocationOnMap() async {
     var selected = LatLng(_latitude ?? 3.139, _longitude ?? 101.6869);
+    final mapController = MapController();
+    final searchController = TextEditingController();
+    var searching = false;
+    String? searchMessage;
+    var sheetClosed = false;
+
+    Future<void> searchArea(StateSetter setSheetState) async {
+      final query = searchController.text.trim();
+      if (query.isEmpty || searching) return;
+      setSheetState(() {
+        searching = true;
+        searchMessage = 'Searching area...';
+      });
+      try {
+        final searchQuery = query.toLowerCase().contains('malaysia')
+            ? query
+            : '$query, Malaysia';
+        final results = await geo.locationFromAddress(searchQuery);
+        if (sheetClosed) return;
+        if (results.isEmpty) {
+          setSheetState(() => searchMessage = 'Area not found.');
+          return;
+        }
+        selected = LatLng(results.first.latitude, results.first.longitude);
+        mapController.move(selected, 15.5);
+        setSheetState(() {
+          searchMessage =
+          'Area found. Tap the map to adjust the exact location.';
+        });
+      } catch (_) {
+        if (!sheetClosed) {
+          setSheetState(
+                () => searchMessage =
+            'Unable to search. Check your internet and try again.',
+          );
+        }
+      } finally {
+        if (!sheetClosed) setSheetState(() => searching = false);
+      }
+    }
 
     final result = await showModalBottomSheet<LatLng>(
       context: context,
@@ -229,7 +266,7 @@ class _ConnectivityScreenState extends State<ConnectivityScreen> {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
-                            'Adjust connectivity location',
+                            'Choose connectivity location',
                             style: TextStyle(
                               fontSize: 19,
                               fontWeight: FontWeight.w800,
@@ -249,8 +286,45 @@ class _ConnectivityScreenState extends State<ConnectivityScreen> {
                   ],
                 ),
               ),
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 0, 16, 10),
+                child: TextField(
+                  controller: searchController,
+                  textInputAction: TextInputAction.search,
+                  onSubmitted: (_) => searchArea(setSheetState),
+                  decoration: safeInput(
+                    'Search area',
+                    icon: Icons.search_rounded,
+                  ).copyWith(
+                    suffixIcon: searching
+                        ? const Padding(
+                      padding: EdgeInsets.all(13),
+                      child: SizedBox(
+                        width: 18,
+                        height: 18,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      ),
+                    )
+                        : IconButton(
+                      tooltip: 'Search area',
+                      onPressed: () => searchArea(setSheetState),
+                      icon: const Icon(Icons.arrow_forward_rounded),
+                    ),
+                  ),
+                ),
+              ),
+              if (searchMessage != null)
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(18, 0, 18, 8),
+                  child: Text(
+                    searchMessage!,
+                    textAlign: TextAlign.center,
+                    style: const TextStyle(color: mutedText, fontSize: 11),
+                  ),
+                ),
               Expanded(
                 child: FlutterMap(
+                  mapController: mapController,
                   options: MapOptions(
                     initialCenter: selected,
                     initialZoom: 16,
@@ -298,6 +372,10 @@ class _ConnectivityScreenState extends State<ConnectivityScreen> {
       ),
     );
 
+    sheetClosed = true;
+    searchController.dispose();
+    mapController.dispose();
+
     if (result == null || !mounted) return;
     setState(() {
       _latitude = result.latitude;
@@ -310,143 +388,27 @@ class _ConnectivityScreenState extends State<ConnectivityScreen> {
     if (!mounted) return;
     setState(() {
       _locating = false;
-      _locationConfirmed = true;
       _locationMessage = 'Map location selected.';
     });
   }
 
-  String _readableAddress(geo.Placemark place) {
-    final parts =
-    <String?>[
-      place.street,
-      place.subLocality,
-      place.locality,
-      place.administrativeArea,
-      place.postalCode,
-      place.country,
-    ]
-        .whereType<String>()
-        .map((part) => part.trim())
-        .where((part) => part.isNotEmpty)
-        .toSet()
-        .toList();
-    return parts.join(', ');
-  }
-
-  Future<bool> _confirmTypedArea() async {
-    final typedArea = _area.text.trim();
-    if (typedArea.isEmpty) {
-      setState(() => _locationMessage = 'Enter an affected area first.');
-      return false;
-    }
-    setState(() {
-      _checkingArea = true;
-      _locationMessage = 'Checking the entered address...';
-    });
-
-    try {
-      final query = typedArea.toLowerCase().contains('malaysia')
-          ? typedArea
-          : '$typedArea, Malaysia';
-      final locations = await geo.locationFromAddress(query);
-      if (!mounted) return false;
-      if (locations.isEmpty) {
-        setState(() {
-          _locationMessage =
-          'Address not found. Enter a more specific place or use the map.';
-        });
-        return false;
-      }
-
-      final location = locations.first;
-      final places = await geo.placemarkFromCoordinates(
-        location.latitude,
-        location.longitude,
-      );
-      if (!mounted) return false;
-      final matchedAddress = places.isEmpty
-          ? typedArea
-          : _readableAddress(places.first);
-      final displayAddress = matchedAddress.isEmpty
-          ? typedArea
-          : matchedAddress;
-
-      final confirmed = await showDialog<bool>(
-        context: context,
-        builder: (context) => AlertDialog(
-          icon: const Icon(Icons.location_on_rounded, color: primary, size: 34),
-          title: const Text('Confirm affected area'),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const Text('We found this address:'),
-              const SizedBox(height: 10),
-              Container(
-                width: double.infinity,
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  color: primary.withValues(alpha: .08),
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: Text(
-                  displayAddress,
-                  style: const TextStyle(fontWeight: FontWeight.w700),
-                ),
-              ),
-              const SizedBox(height: 10),
-              const Text('Is this the correct affected area?'),
-            ],
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context, false),
-              child: const Text('Edit address'),
-            ),
-            FilledButton(
-              onPressed: () => Navigator.pop(context, true),
-              child: const Text('Confirm'),
-            ),
-          ],
-        ),
-      );
-
-      if (confirmed != true || !mounted) {
-        setState(() => _locationMessage = 'Please edit or adjust the area.');
-        return false;
-      }
-
-      setState(() {
-        _area.text = displayAddress;
-        _latitude = location.latitude;
-        _longitude = location.longitude;
-        _locationConfirmed = true;
-        _locationMessage = 'Address confirmed.';
-      });
-      return true;
-    } catch (_) {
-      if (mounted) {
-        setState(() {
-          _locationMessage =
-          'Unable to check this address. Check the internet or use the map.';
-        });
-      }
-      return false;
-    } finally {
-      if (mounted) setState(() => _checkingArea = false);
-    }
-  }
-
   Future<void> _submit() async {
     if (!_key.currentState!.validate() || _saving) return;
-    if (!_locationConfirmed && !await _confirmTypedArea()) return;
-    if (!mounted) return;
+    if (_latitude == null || _longitude == null) {
+      setState(
+            () => _locationMessage =
+        'Detect GPS or choose the affected location on the map.',
+      );
+      return;
+    }
     setState(() => _saving = true);
     await context.read<AppProvider>().addConnectivityReport(
       issueType: _type,
       carrier: _carrier.text.trim(),
       notes: _notes.text.trim(),
       area: _area.text.trim(),
+      latitude: _latitude!,
+      longitude: _longitude!,
     );
     if (!mounted) return;
     _carrier.clear();
@@ -456,7 +418,6 @@ class _ConnectivityScreenState extends State<ConnectivityScreen> {
       _saving = false;
       _latitude = null;
       _longitude = null;
-      _locationConfirmed = false;
       _locationMessage = null;
     });
     ScaffoldMessenger.of(
@@ -542,48 +503,14 @@ class _ConnectivityScreenState extends State<ConnectivityScreen> {
                   const SizedBox(height: 12),
                   TextFormField(
                     controller: _area,
-                    maxLength: 150,
-                    textCapitalization: TextCapitalization.words,
-                    decoration:
-                    safeInput(
+                    readOnly: true,
+                    decoration: safeInput(
                       'Affected area',
                       icon: Icons.location_on_outlined,
-                    ).copyWith(
-                      suffixIcon: IconButton(
-                        tooltip: 'Search and confirm address',
-                        onPressed: _checkingArea
-                            ? null
-                            : () => _confirmTypedArea(),
-                        icon: _checkingArea
-                            ? const Padding(
-                          padding: EdgeInsets.all(13),
-                          child: SizedBox(
-                            width: 18,
-                            height: 18,
-                            child: CircularProgressIndicator(
-                              strokeWidth: 2,
-                            ),
-                          ),
-                        )
-                            : const Icon(Icons.search_rounded),
-                      ),
-                    ),
+                    ).copyWith(hintText: 'Use GPS or choose on map'),
                     validator: (value) => value == null || value.trim().isEmpty
-                        ? 'Enter the affected area'
+                        ? 'Detect GPS or choose a location on the map'
                         : null,
-                    onChanged: (_) {
-                      if (_locationConfirmed ||
-                          _latitude != null ||
-                          _longitude != null) {
-                        setState(() {
-                          _locationConfirmed = false;
-                          _latitude = null;
-                          _longitude = null;
-                          _locationMessage =
-                          'Address changed. It will be checked before submission.';
-                        });
-                      }
-                    },
                   ),
                   const SizedBox(height: 4),
                   Row(
@@ -602,7 +529,7 @@ class _ConnectivityScreenState extends State<ConnectivityScreen> {
                         child: OutlinedButton.icon(
                           onPressed: _locating ? null : _chooseLocationOnMap,
                           icon: const Icon(Icons.map_outlined, size: 19),
-                          label: const Text('Adjust Map'),
+                          label: const Text('Choose on Map'),
                         ),
                       ),
                     ],
@@ -638,14 +565,8 @@ class _ConnectivityScreenState extends State<ConnectivityScreen> {
                   ),
                   const SizedBox(height: 16),
                   FilledButton(
-                    onPressed: _saving || _checkingArea ? null : _submit,
-                    child: Text(
-                      _checkingArea
-                          ? 'Checking address...'
-                          : _saving
-                          ? 'Saving...'
-                          : 'Report Gap',
-                    ),
+                    onPressed: _saving ? null : _submit,
+                    child: Text(_saving ? 'Saving...' : 'Report Gap'),
                   ),
                   const SizedBox(height: 22),
                   const Text(

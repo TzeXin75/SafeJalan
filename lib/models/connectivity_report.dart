@@ -6,6 +6,8 @@ class ConnectivityReport {
     required this.carrier,
     required this.notes,
     required this.area,
+    required this.latitude,
+    required this.longitude,
     required this.reporterEmail,
     this.status = 'Pending',
     required this.createdAt,
@@ -20,6 +22,8 @@ class ConnectivityReport {
   final String carrier;
   final String notes;
   final String area;
+  final double latitude;
+  final double longitude;
   final String reporterEmail;
   final String status;
   final String createdAt;
@@ -35,6 +39,8 @@ class ConnectivityReport {
         carrier: map['carrier'] as String,
         notes: map['notes'] as String,
         area: map['area'] as String,
+        latitude: (map['latitude'] as num?)?.toDouble() ?? 0,
+        longitude: (map['longitude'] as num?)?.toDouble() ?? 0,
         reporterEmail: map['reporterEmail'] as String,
         status: map['status'] as String,
         createdAt: map['createdAt'] as String,
@@ -50,6 +56,8 @@ class ConnectivityReport {
         carrier: map['carrier'] as String,
         notes: map['notes'] as String? ?? '',
         area: map['area'] as String,
+        latitude: (map['latitude'] as num?)?.toDouble() ?? 0,
+        longitude: (map['longitude'] as num?)?.toDouble() ?? 0,
         reporterEmail: map['reporter_email'] as String? ?? '',
         status: map['status'] as String? ?? 'Pending',
         createdAt: map['created_at'] as String,
@@ -64,6 +72,8 @@ class ConnectivityReport {
     'carrier': carrier,
     'notes': notes,
     'area': area,
+    'latitude': latitude,
+    'longitude': longitude,
     'reporterEmail': reporterEmail.toLowerCase(),
     'status': status,
     'createdAt': createdAt,
@@ -78,6 +88,8 @@ class ConnectivityReport {
     'carrier': carrier,
     'notes': notes,
     'area': area,
+    'latitude': latitude,
+    'longitude': longitude,
     'reporter_email': reporterEmail.toLowerCase(),
     'status': status,
     'created_at': createdAt,
@@ -90,6 +102,8 @@ class ConnectivityReport {
     String? carrier,
     String? notes,
     String? area,
+    double? latitude,
+    double? longitude,
     String? status,
     String? updatedAt,
     String? syncStatus,
@@ -101,6 +115,8 @@ class ConnectivityReport {
     carrier: carrier ?? this.carrier,
     notes: notes ?? this.notes,
     area: area ?? this.area,
+    latitude: latitude ?? this.latitude,
+    longitude: longitude ?? this.longitude,
     reporterEmail: reporterEmail,
     status: status ?? this.status,
     createdAt: createdAt,

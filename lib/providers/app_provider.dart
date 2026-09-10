@@ -57,8 +57,8 @@ class AppProvider extends ChangeNotifier {
   List<RoadReport> get myReports => reports
       .where(
         (report) =>
-            report.reporterEmail.isEmpty || report.reporterEmail == email,
-      )
+    report.reporterEmail.isEmpty || report.reporterEmail == email,
+  )
       .toList();
   List<RoadReport> get myVisibleReports => myReports.where((report) {
     final status = report.status.toLowerCase();
@@ -87,7 +87,7 @@ class AppProvider extends ChangeNotifier {
   List<SafetyAnnouncement> get unreadAnnouncements => activeAnnouncements
       .where(
         (announcement) => !_readAnnouncementIds.contains(announcement.remoteId),
-      )
+  )
       .toList();
   List<UserNotificationItem> get unreadUserNotifications =>
       userNotifications.where((item) => !item.isRead).toList();
@@ -100,10 +100,10 @@ class AppProvider extends ChangeNotifier {
 
   bool isUpdatingVerification(RoadReport report) =>
       report.remoteId != null &&
-      _updatingVerificationIds.contains(report.remoteId);
+          _updatingVerificationIds.contains(report.remoteId);
 
   RoadReport latestVersionOf(RoadReport report) => reports.firstWhere(
-    (item) => report.remoteId != null
+        (item) => report.remoteId != null
         ? item.remoteId == report.remoteId
         : item.id == report.id,
     orElse: () => report,
@@ -111,7 +111,7 @@ class AppProvider extends ChangeNotifier {
 
   ConnectivityReport latestConnectivityVersionOf(ConnectivityReport report) =>
       connectivityReports.firstWhere(
-        (item) => item.remoteId == report.remoteId,
+            (item) => item.remoteId == report.remoteId,
         orElse: () => report,
       );
 
@@ -153,10 +153,10 @@ class AppProvider extends ChangeNotifier {
   }
 
   Future<String?> login(
-    String value,
-    String password, {
-    bool admin = false,
-  }) async {
+      String value,
+      String password, {
+        bool admin = false,
+      }) async {
     UserAccount? user;
     if (_supabase.isConfigured && _hadNetwork) {
       try {
@@ -225,10 +225,10 @@ class AppProvider extends ChangeNotifier {
   }
 
   Future<String?> saveProfile(
-    String name,
-    String value, {
-    String? imagePath,
-  }) async {
+      String name,
+      String value, {
+        String? imagePath,
+      }) async {
     if (currentUserId == null) return 'Please log in again';
     final existing = await _database.findUserByEmail(value);
     if (existing != null && existing.id != currentUserId) {
@@ -274,9 +274,9 @@ class AppProvider extends ChangeNotifier {
   }
 
   Future<String?> changePassword(
-    String currentPassword,
-    String newPassword,
-  ) async {
+      String currentPassword,
+      String newPassword,
+      ) async {
     if (currentUserId == null) return 'Please log in again';
     final user = await _database.findUserById(currentUserId!);
     if (user == null || user.passwordHash != _hashPassword(currentPassword)) {
@@ -323,14 +323,14 @@ class AppProvider extends ChangeNotifier {
   }
 
   Future<void> updateReportMaintenance(
-    RoadReport report, {
-    required String status,
-    required String responsibleAgency,
-    required String scheduledRepairDate,
-    required String adminNote,
-    required String completionNote,
-    String? afterImagePath,
-  }) async {
+      RoadReport report, {
+        required String status,
+        required String responsibleAgency,
+        required String scheduledRepairDate,
+        required String adminNote,
+        required String completionNote,
+        String? afterImagePath,
+      }) async {
     final updated = report.copyWith(
       status: status,
       responsibleAgency: responsibleAgency.trim(),
@@ -368,10 +368,10 @@ class AppProvider extends ChangeNotifier {
       final created = DateTime.tryParse(report.createdOn);
       if (created != null && created.isBefore(cutoff)) return false;
       return distance.as(
-            LengthUnit.Meter,
-            point,
-            LatLng(report.latitude, report.longitude),
-          ) <=
+        LengthUnit.Meter,
+        point,
+        LatLng(report.latitude, report.longitude),
+      ) <=
           radiusMetres;
     }).toList();
     matches.sort((a, b) {
@@ -391,19 +391,19 @@ class AppProvider extends ChangeNotifier {
   }
 
   double distanceToReport(
-    RoadReport report, {
-    required double latitude,
-    required double longitude,
-  }) => const Distance().as(
+      RoadReport report, {
+        required double latitude,
+        required double longitude,
+      }) => const Distance().as(
     LengthUnit.Meter,
     LatLng(latitude, longitude),
     LatLng(report.latitude, report.longitude),
   );
 
   Future<void> _createReportStatusNotification(
-    RoadReport previous,
-    RoadReport updated,
-  ) async {
+      RoadReport previous,
+      RoadReport updated,
+      ) async {
     if (previous.status.toLowerCase() == updated.status.toLowerCase() ||
         updated.reporterEmail.isEmpty ||
         updated.remoteId == null) {
@@ -411,24 +411,24 @@ class AppProvider extends ChangeNotifier {
     }
     final copy = switch (updated.status.toLowerCase()) {
       'reviewed' => (
-        'Report reviewed',
-        'Admin reviewed your report ${updated.title}.',
-        'reviewed',
+      'Report reviewed',
+      'Admin reviewed your report ${updated.title}.',
+      'reviewed',
       ),
       'in progress' => (
-        'Repair has started',
-        'Your report ${updated.title} is now In Progress.',
-        'in_progress',
+      'Repair has started',
+      'Your report ${updated.title} is now In Progress.',
+      'in_progress',
       ),
       'resolved' => (
-        'Road repaired',
-        'Your report ${updated.title} was marked Resolved. View the result.',
-        'resolved',
+      'Road repaired',
+      'Your report ${updated.title} was marked Resolved. View the result.',
+      'resolved',
       ),
       'rejected' => (
-        'Report rejected',
-        'Your report ${updated.title} was not approved. View the details.',
-        'rejected',
+      'Report rejected',
+      'Your report ${updated.title} was not approved. View the details.',
+      'rejected',
       ),
       _ => null,
     };
@@ -456,8 +456,8 @@ class AppProvider extends ChangeNotifier {
   }
 
   Future<void> markUserNotificationRead(
-    UserNotificationItem notification,
-  ) async {
+      UserNotificationItem notification,
+      ) async {
     if (!notification.isRead) {
       await _database.markUserNotificationRead(notification.remoteId);
       await _loadUserNotifications();
@@ -540,17 +540,17 @@ class AppProvider extends ChangeNotifier {
 
   bool canModifyOwnReport(RoadReport report) =>
       _isOwnedByCurrentUser(report.reporterEmail) &&
-      report.status.toLowerCase() == 'pending' &&
-      _isWithinFirst24Hours(report.createdOn);
+          report.status.toLowerCase() == 'pending' &&
+          _isWithinFirst24Hours(report.createdOn);
 
   Future<String?> updateOwnReport(
-    RoadReport report, {
-    required String title,
-    required String category,
-    required String severity,
-    required String description,
-    required String locationName,
-  }) async {
+      RoadReport report, {
+        required String title,
+        required String category,
+        required String severity,
+        required String description,
+        required String locationName,
+      }) async {
     if (!canModifyOwnReport(report)) {
       return 'Only your pending report can be edited within 24 hours.';
     }
@@ -583,7 +583,7 @@ class AppProvider extends ChangeNotifier {
       if (report.status.toLowerCase() != 'resolved') return false;
       final resolvedOn =
           DateTime.tryParse(report.updatedAt) ??
-          DateTime.tryParse(report.createdOn);
+              DateTime.tryParse(report.createdOn);
       if (resolvedOn == null) return false;
       final deleteOn = DateTime.utc(
         resolvedOn.year,
@@ -678,13 +678,13 @@ class AppProvider extends ChangeNotifier {
   }
 
   void _scheduleSharedRealtimeRefresh(
-    String key,
-    Future<void> Function() refresh,
-  ) {
+      String key,
+      Future<void> Function() refresh,
+      ) {
     _sharedRealtimeDebounces.remove(key)?.cancel();
     _sharedRealtimeDebounces[key] = Timer(
       const Duration(milliseconds: 350),
-      () {
+          () {
         _sharedRealtimeDebounces.remove(key);
         unawaited(refresh());
       },
@@ -809,7 +809,7 @@ class AppProvider extends ChangeNotifier {
 
   Future<void> markAllNonEmergencyAnnouncementsRead() async {
     for (final announcement in unreadAnnouncements.where(
-      (item) => item.priority.toLowerCase() != 'emergency',
+          (item) => item.priority.toLowerCase() != 'emergency',
     )) {
       await _database.markAnnouncementRead(announcement.remoteId, email);
       _readAnnouncementIds.add(announcement.remoteId);
@@ -876,8 +876,8 @@ class AppProvider extends ChangeNotifier {
     _hadNetwork = initial.any((item) => item != ConnectivityResult.none);
     await _connectivitySubscription?.cancel();
     _connectivitySubscription = connectivity.onConnectivityChanged.listen((
-      results,
-    ) {
+        results,
+        ) {
       final hasNetwork = results.any((item) => item != ConnectivityResult.none);
       if (hasNetwork && !_hadNetwork) unawaited(_retryPendingData());
       _hadNetwork = hasNetwork;
@@ -899,6 +899,8 @@ class AppProvider extends ChangeNotifier {
     required String carrier,
     required String notes,
     required String area,
+    required double latitude,
+    required double longitude,
   }) async {
     final now = DateTime.now().toUtc().toIso8601String();
     await _database.insertConnectivityReport(
@@ -908,6 +910,8 @@ class AppProvider extends ChangeNotifier {
         carrier: carrier,
         notes: notes,
         area: area,
+        latitude: latitude,
+        longitude: longitude,
         reporterEmail: email,
         createdAt: now,
         updatedAt: now,
@@ -919,9 +923,9 @@ class AppProvider extends ChangeNotifier {
   }
 
   Future<bool> updateConnectivityStatus(
-    ConnectivityReport report,
-    String status,
-  ) async {
+      ConnectivityReport report,
+      String status,
+      ) async {
     await _database.updateConnectivityReport(
       report.copyWith(
         status: status,
@@ -946,16 +950,18 @@ class AppProvider extends ChangeNotifier {
 
   bool canModifyOwnConnectivityReport(ConnectivityReport report) =>
       _isOwnedByCurrentUser(report.reporterEmail) &&
-      report.status.toLowerCase() == 'pending' &&
-      _isWithinFirst24Hours(report.createdAt);
+          report.status.toLowerCase() == 'pending' &&
+          _isWithinFirst24Hours(report.createdAt);
 
   Future<String?> updateOwnConnectivityReport(
-    ConnectivityReport report, {
-    required String issueType,
-    required String carrier,
-    required String notes,
-    required String area,
-  }) async {
+      ConnectivityReport report, {
+        required String issueType,
+        required String carrier,
+        required String notes,
+        required String area,
+        required double latitude,
+        required double longitude,
+      }) async {
     if (!canModifyOwnConnectivityReport(report)) {
       return 'Only your pending connectivity report can be edited within 24 hours.';
     }
@@ -965,6 +971,8 @@ class AppProvider extends ChangeNotifier {
         carrier: carrier,
         notes: notes,
         area: area,
+        latitude: latitude,
+        longitude: longitude,
         updatedAt: DateTime.now().toUtc().toIso8601String(),
         syncStatus: 'pending',
       ),
@@ -1047,12 +1055,12 @@ class AppProvider extends ChangeNotifier {
   }
 
   Future<void> updateSafetyAnnouncement(
-    SafetyAnnouncement announcement, {
-    required String title,
-    required String message,
-    required String priority,
-    required bool isActive,
-  }) async {
+      SafetyAnnouncement announcement, {
+        required String title,
+        required String message,
+        required String priority,
+        required bool isActive,
+      }) async {
     await _database.updateSafetyAnnouncement(
       announcement.copyWith(
         title: title,
@@ -1113,11 +1121,11 @@ class AppProvider extends ChangeNotifier {
         final existingRemote = await _supabase.getUserByEmail(user.email);
         final conflictsWithAnotherAccount =
             existingRemote != null &&
-            (existingRemote.passwordHash != user.passwordHash ||
-                existingRemote.isAdmin != user.isAdmin);
+                (existingRemote.passwordHash != user.passwordHash ||
+                    existingRemote.isAdmin != user.isAdmin);
         if (conflictsWithAnotherAccount) {
           lastSyncError =
-              'Account sync conflict (${user.email}): this email already exists online.';
+          'Account sync conflict (${user.email}): this email already exists online.';
           debugPrint('[SafeJalan sync] $lastSyncError');
           notifyListeners();
           return;
@@ -1176,14 +1184,14 @@ class AppProvider extends ChangeNotifier {
         .where((profile) => !adminEmails.contains(profile.key))
         .map(
           (profile) => LeaderboardEntry(
-            name: profile.value.isEmpty
-                ? profile.key.split('@').first
-                : profile.value,
-            email: profile.key,
-            reportCount: reportCounts[profile.key] ?? 0,
-            verificationCount: verificationCounts[profile.key] ?? 0,
-          ),
-        )
+        name: profile.value.isEmpty
+            ? profile.key.split('@').first
+            : profile.value,
+        email: profile.key,
+        reportCount: reportCounts[profile.key] ?? 0,
+        verificationCount: verificationCounts[profile.key] ?? 0,
+      ),
+    )
         .toList();
 
     entries.sort((first, second) {
@@ -1198,7 +1206,7 @@ class AppProvider extends ChangeNotifier {
 
   int get points =>
       myReports.length * 80 +
-      myReports.fold(0, (sum, item) => sum + item.votes * 5);
+          myReports.fold(0, (sum, item) => sum + item.votes * 5);
 
   @override
   void dispose() {
