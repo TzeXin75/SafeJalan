@@ -12,11 +12,15 @@ class DashboardScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final reports = context.watch<AppProvider>().adminVisibleReports;
+    final app = context.watch<AppProvider>();
+    final reports = app.adminVisibleReports;
     final resolved = reports.where((r) => r.status == 'Resolved').length;
     final pending = reports
         .where((r) => r.status.toLowerCase() == 'pending')
         .length;
+    final connectivityReports = app.connectivityReports
+        .where((report) => !report.isDeleted)
+        .toList();
     return SafeArea(
       child: ListView(
         padding: const EdgeInsets.all(16),
@@ -62,6 +66,13 @@ class DashboardScreen extends StatelessWidget {
                 Colors.red,
                 onTap: () => onNavigate(2, 'Pending'),
               ),
+              _Kpi(
+                Icons.wifi_off_rounded,
+                '${connectivityReports.length}',
+                'Connectivity',
+                const Color(0xFF8B5CF6),
+                onTap: () => onNavigate(3, null),
+              ),
             ],
           ),
           const SizedBox(height: 20),
@@ -105,15 +116,15 @@ class DashboardScreen extends StatelessWidget {
               .take(3)
               .map(
                 (r) => ReportTile(
-                  report: r,
-                  onTap: () => Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (_) => AdminReportDetailScreen(report: r),
-                    ),
-                  ),
+              report: r,
+              onTap: () => Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => AdminReportDetailScreen(report: r),
                 ),
               ),
+            ),
+          ),
         ],
       ),
     );
@@ -126,12 +137,12 @@ class _Kpi extends StatelessWidget {
   final Color color;
   final VoidCallback onTap;
   const _Kpi(
-    this.icon,
-    this.value,
-    this.label,
-    this.color, {
-    required this.onTap,
-  });
+      this.icon,
+      this.value,
+      this.label,
+      this.color, {
+        required this.onTap,
+      });
 
   @override
   Widget build(BuildContext context) => Semantics(
