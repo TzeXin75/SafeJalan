@@ -109,12 +109,10 @@ class _LeaderboardScreenState extends State<LeaderboardScreen> {
                   );
                 }
                 final rawEntries = snapshot.data ?? [];
-                final entries = rawEntries
-                    .where(
-                      (entry) =>
-                          entry.points >= 1 && entry.email != currentEmail,
-                    )
+                final rankedEntries = rawEntries
+                    .where((entry) => entry.points >= 1)
                     .toList();
+                final topEntries = rankedEntries.take(10).toList();
 
                 LeaderboardEntry? myEntry;
                 for (final entry in rawEntries) {
@@ -124,7 +122,16 @@ class _LeaderboardScreenState extends State<LeaderboardScreen> {
                   }
                 }
 
-                if (entries.isEmpty && myEntry == null) {
+                final currentRankIndex = rankedEntries.indexWhere(
+                  (entry) => entry.email == currentEmail,
+                );
+                final currentRank = currentRankIndex < 0
+                    ? null
+                    : currentRankIndex + 1;
+                final currentIsInTopTen =
+                    currentRank != null && currentRank <= 10;
+
+                if (rawEntries.isEmpty) {
                   return _LeaderboardMessage(
                     icon: Icons.leaderboard_outlined,
                     title: 'No registered users yet',
@@ -136,12 +143,12 @@ class _LeaderboardScreenState extends State<LeaderboardScreen> {
                 return Column(
                   children: [
                     Expanded(
-                      child: entries.isEmpty
+                      child: topEntries.isEmpty
                           ? _LeaderboardMessage(
                               icon: Icons.leaderboard_outlined,
                               title: 'No ranked reporters yet',
                               message:
-                                  'Reporters with at least 1 point will appear here.',
+                                  'Submit a report or receive a verification to enter the leaderboard.',
                               onRetry: _refresh,
                             )
                           : RefreshIndicator(
@@ -149,13 +156,16 @@ class _LeaderboardScreenState extends State<LeaderboardScreen> {
                               child: ListView.separated(
                                 physics: const AlwaysScrollableScrollPhysics(),
                                 padding: const EdgeInsets.all(16),
-                                itemCount: entries.length,
+                                itemCount: topEntries.length,
                                 separatorBuilder: (_, _) =>
                                     const SizedBox(height: 9),
                                 itemBuilder: (context, index) {
-                                  final entry = entries[index];
+                                  final entry = topEntries[index];
+                                  final isCurrent = entry.email == currentEmail;
                                   return Card(
-                                    color: Colors.white,
+                                    color: isCurrent
+                                        ? primary.withValues(alpha: .07)
+                                        : Colors.white,
                                     child: Padding(
                                       padding: const EdgeInsets.symmetric(
                                         vertical: 3,
@@ -173,12 +183,26 @@ class _LeaderboardScreenState extends State<LeaderboardScreen> {
                                             ),
                                           ),
                                         ),
-                                        title: Text(
-                                          entry.name,
-                                          overflow: TextOverflow.ellipsis,
-                                          style: const TextStyle(
-                                            fontWeight: FontWeight.w800,
-                                          ),
+                                        title: Row(
+                                          children: [
+                                            Flexible(
+                                              child: Text(
+                                                entry.name,
+                                                overflow: TextOverflow.ellipsis,
+                                                style: const TextStyle(
+                                                  fontWeight: FontWeight.w800,
+                                                ),
+                                              ),
+                                            ),
+                                            if (isCurrent) ...[
+                                              const SizedBox(width: 7),
+                                              const Chip(
+                                                visualDensity:
+                                                    VisualDensity.compact,
+                                                label: Text('You'),
+                                              ),
+                                            ],
+                                          ],
                                         ),
                                         subtitle: Text(
                                           '${entry.reportCount} reports · '
@@ -199,7 +223,8 @@ class _LeaderboardScreenState extends State<LeaderboardScreen> {
                               ),
                             ),
                     ),
-                    if (myEntry != null) _MyStandingCard(entry: myEntry),
+                    if (myEntry != null && !currentIsInTopTen)
+                      _MyStandingCard(entry: myEntry, rank: currentRank),
                   ],
                 );
               },
@@ -220,8 +245,9 @@ class _LeaderboardScreenState extends State<LeaderboardScreen> {
 
 class _MyStandingCard extends StatelessWidget {
   final LeaderboardEntry entry;
+  final int? rank;
 
-  const _MyStandingCard({required this.entry});
+  const _MyStandingCard({required this.entry, required this.rank});
 
   @override
   Widget build(BuildContext context) => Container(
@@ -242,9 +268,9 @@ class _MyStandingCard extends StatelessWidget {
       mainAxisSize: MainAxisSize.min,
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Text(
-          'Your standing',
-          style: TextStyle(
+        Text(
+          rank == null ? 'Your standing · Unranked' : 'Your standing · #$rank',
+          style: const TextStyle(
             fontSize: 12,
             fontWeight: FontWeight.w700,
             color: Colors.blueGrey,
