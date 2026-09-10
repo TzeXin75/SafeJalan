@@ -1,9 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-
-import 'package:safejalan_native/models/safety_announcement.dart';
-import 'package:safejalan_native/providers/app_provider.dart';
-import 'package:safejalan_native/widgets/common.dart';
+import 'package:safejalan/models/safety_announcement.dart';
+import 'package:safejalan/providers/app_provider.dart';
+import 'package:safejalan/widgets/common.dart';
 
 class ManageAnnouncementsScreen extends StatelessWidget {
   const ManageAnnouncementsScreen({super.key});

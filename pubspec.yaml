@@ -1,4 +1,4 @@
-name: safejalan_native
+name: safejalan
 description: SafeJalan built with native Flutter widgets following BMIT2073 practical methods.
 publish_to: none
 version: 1.0.0+1

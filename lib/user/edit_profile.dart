@@ -1,13 +1,11 @@
 import 'dart:io';
-
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:provider/provider.dart';
-
-import 'package:safejalan_native/providers/app_provider.dart';
-import 'package:safejalan_native/widgets/common.dart';
-import 'package:safejalan_native/widgets/stored_image.dart';
+import 'package:safejalan/providers/app_provider.dart';
+import 'package:safejalan/widgets/common.dart';
+import 'package:safejalan/widgets/stored_image.dart';
 
 class EditProfileScreen extends StatefulWidget {
   const EditProfileScreen({super.key});

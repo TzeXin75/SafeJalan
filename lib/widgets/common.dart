@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
-import 'package:safejalan_native/models/report.dart';
-import 'package:safejalan_native/widgets/stored_image.dart';
+import 'package:safejalan/models/report.dart';
+import 'package:safejalan/widgets/stored_image.dart';
 
 const navy = Color(0xFF101828);
 const primary = Color(0xFF3B5BDB);

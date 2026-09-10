@@ -1,21 +1,20 @@
 import 'dart:async';
 import 'dart:convert';
-
 import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:crypto/crypto.dart';
 import 'package:flutter/material.dart';
 import 'package:latlong2/latlong.dart';
 import 'package:sqflite/sqflite.dart';
 import 'package:uuid/uuid.dart';
-import 'package:safejalan_native/models/connectivity_report.dart';
-import 'package:safejalan_native/models/leaderboard_entry.dart';
-import 'package:safejalan_native/models/user_account.dart';
-import 'package:safejalan_native/models/report.dart';
-import 'package:safejalan_native/models/safety_announcement.dart';
-import 'package:safejalan_native/models/user_notification.dart';
-import 'package:safejalan_native/repositories/report_repository.dart';
-import 'package:safejalan_native/services/database_service.dart';
-import 'package:safejalan_native/services/supabase_service.dart';
+import 'package:safejalan/models/connectivity_report.dart';
+import 'package:safejalan/models/leaderboard_entry.dart';
+import 'package:safejalan/models/user_account.dart';
+import 'package:safejalan/models/report.dart';
+import 'package:safejalan/models/safety_announcement.dart';
+import 'package:safejalan/models/user_notification.dart';
+import 'package:safejalan/repositories/report_repository.dart';
+import 'package:safejalan/services/database_service.dart';
+import 'package:safejalan/services/supabase_service.dart';
 
 class AppProvider extends ChangeNotifier {
   final DatabaseService _database = DatabaseService.instance;

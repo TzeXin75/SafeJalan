@@ -2,11 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
 import 'package:provider/provider.dart';
-
-import 'package:safejalan_native/providers/app_provider.dart';
-import 'package:safejalan_native/widgets/common.dart';
-import 'package:safejalan_native/user/notifications.dart';
-import 'package:safejalan_native/user/report_detail.dart';
+import 'package:safejalan/providers/app_provider.dart';
+import 'package:safejalan/widgets/common.dart';
+import 'package:safejalan/user/notifications.dart';
+import 'package:safejalan/user/report_detail.dart';
 
 class MapScreen extends StatelessWidget {
   const MapScreen({super.key});

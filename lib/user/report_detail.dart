@@ -1,11 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
-import 'package:safejalan_native/models/report.dart';
-import 'package:safejalan_native/models/report_categories.dart';
-import 'package:safejalan_native/providers/app_provider.dart';
-import 'package:safejalan_native/widgets/common.dart';
-import 'package:safejalan_native/widgets/stored_image.dart';
+import 'package:safejalan/models/report.dart';
+import 'package:safejalan/models/report_categories.dart';
+import 'package:safejalan/providers/app_provider.dart';
+import 'package:safejalan/widgets/common.dart';
+import 'package:safejalan/widgets/stored_image.dart';
 
 final _reportLetterOrNumberPattern = RegExp(
   r'[A-Za-z0-9\u00C0-\u024F\u4E00-\u9FFF]',

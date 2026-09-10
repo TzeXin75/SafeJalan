@@ -1,11 +1,10 @@
 import 'package:path_provider/path_provider.dart';
 import 'package:sqflite/sqflite.dart';
-
-import 'package:safejalan_native/models/connectivity_report.dart';
-import 'package:safejalan_native/models/report.dart';
-import 'package:safejalan_native/models/safety_announcement.dart';
-import 'package:safejalan_native/models/user_account.dart';
-import 'package:safejalan_native/models/user_notification.dart';
+import 'package:safejalan/models/connectivity_report.dart';
+import 'package:safejalan/models/report.dart';
+import 'package:safejalan/models/safety_announcement.dart';
+import 'package:safejalan/models/user_account.dart';
+import 'package:safejalan/models/user_notification.dart';
 
 class DatabaseService {
   DatabaseService._internal();

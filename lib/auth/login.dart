@@ -1,12 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-
-import 'package:safejalan_native/providers/app_provider.dart';
-import 'package:safejalan_native/widgets/common.dart';
-import 'package:safejalan_native/admin/admin_home.dart';
-import 'package:safejalan_native/user/user_home.dart';
-import 'package:safejalan_native/auth/forgot_password.dart';
-import 'package:safejalan_native/auth/register.dart';
+import 'package:safejalan/providers/app_provider.dart';
+import 'package:safejalan/widgets/common.dart';
+import 'package:safejalan/admin/admin_home.dart';
+import 'package:safejalan/user/user_home.dart';
+import 'package:safejalan/auth/forgot_password.dart';
+import 'package:safejalan/auth/register.dart';
 
 class LoginScreen extends StatefulWidget {
   final bool admin;

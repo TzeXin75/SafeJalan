@@ -1,9 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-
-import 'package:safejalan_native/models/connectivity_report.dart';
-import 'package:safejalan_native/providers/app_provider.dart';
-import 'package:safejalan_native/widgets/common.dart';
+import 'package:safejalan/models/connectivity_report.dart';
+import 'package:safejalan/providers/app_provider.dart';
+import 'package:safejalan/widgets/common.dart';
 
 class ManageConnectivityScreen extends StatefulWidget {
   const ManageConnectivityScreen({super.key});

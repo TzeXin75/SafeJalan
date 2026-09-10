@@ -1,14 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import 'package:safejalan_native/entry.dart';
-import 'package:safejalan_native/providers/app_provider.dart';
-import 'package:safejalan_native/user/map.dart';
-import 'package:safejalan_native/user/report_form.dart';
-import 'package:safejalan_native/user/connectivity.dart';
-import 'package:safejalan_native/user/leaderboard.dart';
-import 'package:safejalan_native/user/profile.dart';
-import 'package:safejalan_native/user/notifications.dart';
-import 'package:safejalan_native/widgets/common.dart';
+import 'package:safejalan/entry.dart';
+import 'package:safejalan/providers/app_provider.dart';
+import 'package:safejalan/user/map.dart';
+import 'package:safejalan/user/report_form.dart';
+import 'package:safejalan/user/connectivity.dart';
+import 'package:safejalan/user/leaderboard.dart';
+import 'package:safejalan/user/profile.dart';
+import 'package:safejalan/user/notifications.dart';
+import 'package:safejalan/widgets/common.dart';
 
 class UserHome extends StatefulWidget {
   const UserHome({super.key, this.showWelcome = false});

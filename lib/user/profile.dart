@@ -1,11 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import 'package:safejalan_native/providers/app_provider.dart';
-import 'package:safejalan_native/widgets/common.dart';
-import 'package:safejalan_native/entry.dart';
-import 'package:safejalan_native/user/report_detail.dart';
-import 'package:safejalan_native/user/edit_profile.dart';
-import 'package:safejalan_native/widgets/stored_image.dart';
+import 'package:safejalan/providers/app_provider.dart';
+import 'package:safejalan/widgets/common.dart';
+import 'package:safejalan/entry.dart';
+import 'package:safejalan/user/report_detail.dart';
+import 'package:safejalan/user/edit_profile.dart';
+import 'package:safejalan/widgets/stored_image.dart';
 
 class ProfileScreen extends StatelessWidget {
   const ProfileScreen({super.key});

@@ -1,13 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
-
-import 'package:safejalan_native/models/safety_announcement.dart';
-import 'package:safejalan_native/models/user_notification.dart';
-import 'package:safejalan_native/providers/app_provider.dart';
-import 'package:safejalan_native/user/announcement_detail.dart';
-import 'package:safejalan_native/user/report_detail.dart';
-import 'package:safejalan_native/widgets/common.dart';
+import 'package:safejalan/models/safety_announcement.dart';
+import 'package:safejalan/models/user_notification.dart';
+import 'package:safejalan/providers/app_provider.dart';
+import 'package:safejalan/user/announcement_detail.dart';
+import 'package:safejalan/user/report_detail.dart';
+import 'package:safejalan/widgets/common.dart';
 
 class UserNotificationsScreen extends StatelessWidget {
   const UserNotificationsScreen({super.key, this.initialTab = 0});

@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
-import 'package:safejalan_native/widgets/common.dart';
-import 'package:safejalan_native/admin/manage_announcements.dart';
-import 'package:safejalan_native/admin/risk_heatmap.dart';
-import 'package:safejalan_native/admin/statistics.dart';
+import 'package:safejalan/widgets/common.dart';
+import 'package:safejalan/admin/manage_announcements.dart';
+import 'package:safejalan/admin/risk_heatmap.dart';
+import 'package:safejalan/admin/statistics.dart';
 
 class AdminToolsScreen extends StatelessWidget {
   const AdminToolsScreen({super.key});

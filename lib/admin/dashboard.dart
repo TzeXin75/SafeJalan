@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import 'package:safejalan_native/providers/app_provider.dart';
-import 'package:safejalan_native/services/database_service.dart';
-import 'package:safejalan_native/widgets/common.dart';
-import 'package:safejalan_native/admin/report_detail.dart';
+import 'package:safejalan/providers/app_provider.dart';
+import 'package:safejalan/services/database_service.dart';
+import 'package:safejalan/widgets/common.dart';
+import 'package:safejalan/admin/report_detail.dart';
 
 class DashboardScreen extends StatelessWidget {
   const DashboardScreen({super.key});

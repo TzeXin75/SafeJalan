@@ -2,15 +2,14 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
-import 'package:safejalan_native/providers/app_provider.dart';
-import 'package:safejalan_native/entry.dart';
-import 'package:safejalan_native/services/supabase_service.dart';
-import 'package:safejalan_native/widgets/common.dart';
-import 'package:safejalan_native/admin/admin_home.dart';
-import 'package:safejalan_native/user/user_home.dart';
+import 'package:safejalan/providers/app_provider.dart';
+import 'package:safejalan/entry.dart';
+import 'package:safejalan/services/supabase_service.dart';
+import 'package:safejalan/widgets/common.dart';
+import 'package:safejalan/admin/admin_home.dart';
+import 'package:safejalan/user/user_home.dart';
 
 const String supabaseUrl = 'https://ubcunymjqlxqznyuvmey.supabase.co';
-
 const String supabaseKey = '';
 
 void main() {

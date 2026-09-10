@@ -11,11 +11,11 @@ import 'package:latlong2/latlong.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:permission_handler/permission_handler.dart' as handler;
 import 'package:provider/provider.dart';
-import 'package:safejalan_native/models/report.dart';
-import 'package:safejalan_native/models/report_categories.dart';
-import 'package:safejalan_native/providers/app_provider.dart';
-import 'package:safejalan_native/widgets/common.dart';
-import 'package:safejalan_native/user/report_detail.dart';
+import 'package:safejalan/models/report.dart';
+import 'package:safejalan/models/report_categories.dart';
+import 'package:safejalan/providers/app_provider.dart';
+import 'package:safejalan/widgets/common.dart';
+import 'package:safejalan/user/report_detail.dart';
 
 enum _DuplicateAction { viewExisting, submitAnyway }
 

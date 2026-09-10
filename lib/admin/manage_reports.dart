@@ -1,10 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import 'package:safejalan_native/providers/app_provider.dart';
-import 'package:safejalan_native/widgets/common.dart';
-import 'package:safejalan_native/admin/report_detail.dart';
-import 'package:safejalan_native/models/report.dart';
-import 'package:safejalan_native/widgets/stored_image.dart';
+import 'package:safejalan/providers/app_provider.dart';
+import 'package:safejalan/widgets/common.dart';
+import 'package:safejalan/admin/report_detail.dart';
+import 'package:safejalan/models/report.dart';
+import 'package:safejalan/widgets/stored_image.dart';
 
 class ManageReportsScreen extends StatelessWidget {
   const ManageReportsScreen({super.key});
