@@ -8,7 +8,6 @@ import 'package:permission_handler/permission_handler.dart' as handler;
 import 'package:provider/provider.dart';
 import 'package:safejalan/providers/app_provider.dart';
 import 'package:safejalan/widgets/common.dart';
-import 'package:safejalan/user/connectivity_detail.dart';
 
 class ConnectivityScreen extends StatefulWidget {
   const ConnectivityScreen({super.key});
@@ -427,13 +426,6 @@ class _ConnectivityScreenState extends State<ConnectivityScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final app = context.watch<AppProvider>();
-    final items = app.connectivityReports
-        .where(
-          (report) =>
-      report.reporterEmail.toLowerCase() == app.email.toLowerCase(),
-    )
-        .toList();
     return SafeArea(
       child: Column(
         children: [
@@ -567,50 +559,6 @@ class _ConnectivityScreenState extends State<ConnectivityScreen> {
                   FilledButton(
                     onPressed: _saving ? null : _submit,
                     child: Text(_saving ? 'Saving...' : 'Report Gap'),
-                  ),
-                  const SizedBox(height: 22),
-                  const Text(
-                    'My Connectivity Reports',
-                    style: TextStyle(fontSize: 17, fontWeight: FontWeight.bold),
-                  ),
-                  const SizedBox(height: 8),
-                  if (items.isEmpty)
-                    const Card(
-                      child: Padding(
-                        padding: EdgeInsets.all(18),
-                        child: Text('No connectivity reports yet.'),
-                      ),
-                    ),
-                  ...items.map(
-                        (item) => Card(
-                      margin: const EdgeInsets.only(bottom: 10),
-                      child: ListTile(
-                        onTap: () => Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (_) =>
-                                ConnectivityDetailScreen(report: item),
-                          ),
-                        ),
-                        leading: const CircleAvatar(
-                          child: Icon(Icons.wifi_off),
-                        ),
-                        title: Text(item.area),
-                        subtitle: Text(
-                          '${item.carrier} · ${item.issueType}\n${item.notes}',
-                        ),
-                        isThreeLine: true,
-                        trailing: Column(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          crossAxisAlignment: CrossAxisAlignment.end,
-                          children: [
-                            LabelBadge(item.status, statusColor(item.status)),
-                            const SizedBox(height: 4),
-                            const Icon(Icons.chevron_right, size: 18),
-                          ],
-                        ),
-                      ),
-                    ),
                   ),
                 ],
               ),
