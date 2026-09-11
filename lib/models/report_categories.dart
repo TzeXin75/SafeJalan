@@ -239,8 +239,6 @@ ReportCategoryAnalysis analyseReportCategories(
     }
   }
 
-  // A short title normally describes the issue more directly than the longer
-  // description, so it receives the stronger supporting weight.
   addTextEvidence(titleText, 1.15);
   addTextEvidence(descriptionText, .75);
 
