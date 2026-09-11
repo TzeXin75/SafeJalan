@@ -178,10 +178,7 @@ class _ReportFormScreenState extends State<ReportFormScreen> {
             : 'Add more issue details or select a category manually';
         return;
       }
-
-      // The photo produces the initial candidates. Final automatic selection
-      // waits for at least one piece of text so the title or description can
-      // confirm or correct the visual result.
+      
       if (hasTextContext && analysis.canAutoSelect) {
         final suggestion = analysis.suggestions.first;
         _category = suggestion.category;
