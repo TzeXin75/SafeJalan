@@ -87,6 +87,7 @@ class _ConnectivityScreenState extends State<ConnectivityScreen> {
 
   Future<void> _detectLocation() async {
     if (_locating) {
+      if (!mounted) return;
       setState(() {
         _locationRun++;
         _locating = false;
@@ -97,6 +98,7 @@ class _ConnectivityScreenState extends State<ConnectivityScreen> {
     }
 
     final locationRun = ++_locationRun;
+    if (!mounted) return;
     setState(() {
       _locating = true;
       _locationMessage = 'Detecting your current location...';
@@ -134,7 +136,9 @@ class _ConnectivityScreenState extends State<ConnectivityScreen> {
       _longitude = data.longitude;
 
       if (_latitude == null || _longitude == null) {
-        setState(() => _locationMessage = 'GPS did not return coordinates.');
+        if (mounted && locationRun == _locationRun) {
+          setState(() => _locationMessage = 'GPS did not return coordinates.');
+        }
         return;
       }
 
